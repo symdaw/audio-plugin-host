@@ -299,6 +299,7 @@ impl PluginInner for Vst2 {
             can_automate,
             is_wrap_around: false,
             read_only: false,
+            default_value: None,
         }
     }
 
@@ -327,8 +328,8 @@ impl PluginInner for Vst2 {
             // works for most plugins.
 
             outputs.clear();
-            inputs.clear();
-        
+            inputs.clear(); 
+
             match info.inputs {
                 0 => {}
                 1 | 2 => {

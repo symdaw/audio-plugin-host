@@ -131,6 +131,7 @@ struct ParameterFFI {
   bool can_automate;
   bool is_wrap_around;
   bool read_only;
+  float default_value;
 };
 
 /// Events sent to the host from the plugin. Queued in the plugin and the consumed from the `get_events` function.

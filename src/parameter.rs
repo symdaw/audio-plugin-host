@@ -7,12 +7,16 @@ pub struct Parameter {
     pub id: i32,
     pub name: String,
     pub index: i32,
+    /// Normalized parameter value in [0.0, 1.0].
     pub value: f32,
+    /// Value as string formatted by the plugin. E.g. "0 dB", "50 Hz", etc.
     pub formatted_value: String,
     pub hidden: bool,
     pub can_automate: bool,
     pub is_wrap_around: bool,
     pub read_only: bool,
+    /// Default normalized value if supported by the format. Not supported by VST2.
+    pub default_value: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,4 +43,32 @@ impl ParameterUpdate {
             end_edit: false,
         }
     }
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub union ParameterIdentifier {
+    raw: u64,
+    vst2: i32,
+    vst3: IndexIdPair,
+}
+
+impl ParameterIdentifier {
+    pub fn raw(&self) -> u64 {
+        unsafe { self.raw }
+    }
+
+    pub fn as_vst2(&self) -> i32 {
+        unsafe { self.vst2 }
+    }
+
+    pub fn as_vst3(&self) -> IndexIdPair {
+        unsafe { self.vst3 }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct IndexIdPair {
+    pub index: i32,
+    pub id: i32,
 }

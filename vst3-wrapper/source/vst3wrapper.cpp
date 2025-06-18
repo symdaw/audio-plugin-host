@@ -826,6 +826,7 @@ ParameterFFI get_parameter(const void *app, int32_t id) {
   param.hidden = (param_info.flags & ParameterInfo::kIsHidden) != 0;
   param.can_automate = (param_info.flags & ParameterInfo::kCanAutomate) != 0;
   param.read_only = (param_info.flags & ParameterInfo::kIsReadOnly) != 0;
+  param.default_value = (float)param_info.defaultNormalizedValue;
 
   return param;
 }

@@ -104,6 +104,7 @@ pub(super) struct ParameterFFI {
     can_automate: bool,
     is_wrap_around: bool,
     read_only: bool,
+    default_value: std::os::raw::c_float,
 }
 
 impl ParameterFFI {
@@ -118,6 +119,7 @@ impl ParameterFFI {
             can_automate: self.can_automate,
             is_wrap_around: self.is_wrap_around,
             read_only: self.read_only,
+            default_value: Some(self.default_value as f32),
         }
     }
 }

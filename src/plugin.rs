@@ -90,7 +90,7 @@ impl PluginInstance {
 
         let mut events = Vec::new();
         while let Some(event) = self.plugin_issued_events.try_pop() {
-            events.extend(self.handle_plugin_event(&event));
+            events.extend(self.create_subsequent_events(&event));
 
             events.push(event);
         }
@@ -206,7 +206,7 @@ impl PluginInstance {
     }
 
     /// Returns any new events
-    fn handle_plugin_event(&mut self, event: &PluginIssuedEvent) -> Vec<PluginIssuedEvent> {
+    fn create_subsequent_events(&mut self, event: &PluginIssuedEvent) -> Vec<PluginIssuedEvent> {
         match event {
             PluginIssuedEvent::IOChanged => {
                 self.io_configuration = self.inner.get_io_configuration();
