@@ -5,6 +5,9 @@ pub struct AudioBus<'a, T> {
     owned_data: *mut Vec<Vec<T>>,
 }
 
+unsafe impl<'a, T> Sync for AudioBus<'a, T> {}
+unsafe impl<'a, T> Send for AudioBus<'a, T> {}
+
 impl<'a, T> AudioBus<'a, T> {
     pub fn new(data: &'a mut Vec<Vec<T>>) -> Self {
         AudioBus {
