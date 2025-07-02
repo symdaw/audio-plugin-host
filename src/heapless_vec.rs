@@ -57,6 +57,16 @@ impl<T: Copy, const N: usize> HeaplessVec<T, N> {
         }
     }
 
+    pub fn from(data: &[T]) -> Result<Self, Error> {
+        let mut ret = Self::new();
+
+        for item in data {
+            ret.push(item.clone())?
+        }
+
+        Ok(ret)
+    }
+
     pub fn push(&mut self, value: T) -> Result<(), Error> {
         if self.count < N {
             self.data[self.count].value = value;

@@ -19,7 +19,7 @@ pub struct PluginDescriptor {
 
 impl PluginDescriptor {
     pub fn load(&self, host: &Host) -> Result<PluginInstance, Error> {
-        load(&self.path, host)
+        load(&self.path, &self.id, host)
     }
 }
 
@@ -31,8 +31,22 @@ pub enum Format {
     Clap,
 }
 
-pub fn scan_directory(_path: PathBuf) -> Vec<PluginDescriptor> {
-    todo!();
+/// Returns any plugin descriptors of plugins in a file. Note that formats such as VST3 allow 
+/// multiple plugins to be defined in the same file.
+pub fn get_descriptor_from_file(path: impl AsRef<Path>) -> Vec<PluginDescriptor> {
+    if is_vst2(path.as_ref(), false) {
+        let Some(desc) = crate::formats::vst2::get_descriptor(path.as_ref()) else {
+            return vec![];
+        };
+
+        vec![desc]
+    } else if is_vst3(path.as_ref()) {
+        crate::formats::vst3::get_descriptor(path.as_ref())
+    } else if is_clap(path.as_ref()) {
+        todo!()
+    } else {
+        unimplemented!()
+    }
 }
 
 pub fn is_vst2(path: &Path, check_contents: bool) -> bool {

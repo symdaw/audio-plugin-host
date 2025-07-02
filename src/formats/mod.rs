@@ -1,6 +1,6 @@
-mod clap;
-mod vst2;
-mod vst3;
+pub(crate) mod clap;
+pub(crate) mod vst2;
+pub(crate) mod vst3;
 
 use std::path::Path;
 
@@ -14,6 +14,7 @@ use crate::plugin::PluginInner;
 
 pub fn load_any(
     path: &Path,
+    id: &str,
     common: Common,
 ) -> Result<(Box<dyn PluginInner>, PluginDescriptor), Error> {
     if is_vst2(path, true) {
@@ -21,7 +22,7 @@ pub fn load_any(
     }
 
     if is_vst3(path) {
-        return vst3::load(path, common);
+        return vst3::load(path, id, common);
     }
 
     if is_clap(path) {

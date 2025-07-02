@@ -34,7 +34,7 @@ public:
   PluginInstance();
   ~PluginInstance();
 
-  bool init(const std::string &path);
+  bool init(const std::string &path, const std::string &id);
   void destroy();
 
   IOConfigutaion _io_config;

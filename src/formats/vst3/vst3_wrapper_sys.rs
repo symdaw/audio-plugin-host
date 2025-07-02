@@ -6,16 +6,12 @@ use std::{
 use ringbuf::{traits::Producer, HeapProd};
 
 use crate::{
-    audio_bus::IOConfigutaion,
-    event::{HostIssuedEvent, PluginIssuedEvent},
-    formats::{vst3::Vst3, Format, PluginDescriptor},
-    parameter::Parameter,
-    ProcessDetails,
+    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{clap::load, vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, ProcessDetails
 };
 
 #[link(name = "vst3wrapper", kind = "static")]
 extern "C" {
-    pub(super) fn load_plugin(s: *const c_char, vst3_instance: *const c_void) -> *const c_void;
+    pub(super) fn load_plugin(path: *const c_char, id: *const c_char, vst3_instance: *const c_void) -> *const c_void;
     pub(super) fn show_gui(app: *const c_void, window_id: *const c_void) -> Dims;
     pub(super) fn hide_gui(app: *const c_void);
     pub(super) fn descriptor(app: *const c_void) -> FFIPluginDescriptor;
@@ -41,6 +37,7 @@ extern "C" {
     pub(super) fn set_data(app: *const c_void, data: *const c_void, data_len: i32);
     pub(super) fn set_processing(app: *const c_void, processing: bool);
     pub(super) fn get_latency(app: *const c_void) -> u32;
+    pub(super) fn get_descriptors(path: *const c_char, plugins: *mut HeaplessVec<FFIPluginDescriptor, 10>);
 
     fn free_string(str: *const c_char);
 }

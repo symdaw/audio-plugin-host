@@ -181,7 +181,7 @@ struct PluginIssuedEvent {
 
 extern "C" {
 
-extern const void *load_plugin(const char *s, const void *vst3_instance);
+extern const void *load_plugin(const char *path, const char *id, const void *vst3_instance);
 
 extern Dims show_gui(const void *app, const void *window_id);
 
@@ -213,6 +213,8 @@ extern void set_data(const void *app, const void *data, int32_t data_len);
 extern void set_processing(const void *app, bool processing);
 
 extern uint32_t get_latency(const void *app);
+
+extern void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plugins);
 
 extern void free_string(const char *str);
 

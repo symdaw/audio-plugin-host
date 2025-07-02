@@ -15,8 +15,17 @@ let host = host::Host::new(
     env!("CARGO_PKG_AUTHORS"),
 );
 
-let mut plugin = plugin::load(&PathBuf::from(plugin_path), &host).unwrap();
-println!("{:?}\n{:?}", plugin.descriptor, plugin.get_io_configuration());
+let descriptors = discovery::get_descriptor_from_file(&plugin_path);
+println!("{:?}", descriptors);
+
+let mut plugin = plugin::load(
+    &plugin_path,
+    &descriptors.first().expect("No plugins in file").id,
+    &host,
+)
+.unwrap();
+
+println!("{:?}", plugin.get_io_configuration());
 ```
 
 ### Processing

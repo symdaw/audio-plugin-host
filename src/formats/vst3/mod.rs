@@ -11,6 +11,8 @@ use crate::discovery::PluginDescriptor;
 use crate::error::Error;
 use crate::event::HostIssuedEventType;
 use crate::event::{HostIssuedEvent, PluginIssuedEvent};
+use crate::formats::vst3::vst3_wrapper_sys::FFIPluginDescriptor;
+use crate::heapless_vec::HeaplessVec;
 use crate::parameter::ParameterUpdate;
 use crate::plugin::PluginInner;
 use crate::{ProcessDetails, Samples};
@@ -28,6 +30,7 @@ struct Vst3 {
 
 pub fn load(
     path: &Path,
+    id: &str,
     common: Common,
 ) -> Result<(Box<dyn PluginInner>, PluginDescriptor), Error> {
     let plugin_issued_events_producer = Box::new(common.plugin_issued_events_producer);
@@ -43,8 +46,10 @@ pub fn load(
 
     let app = unsafe {
         let plugin_path = std::ffi::CString::new(path.to_str().unwrap()).unwrap();
+        let plugin_id = std::ffi::CString::new(id).unwrap();
         vst3_wrapper_sys::load_plugin(
             plugin_path.as_ptr(),
+            plugin_id.as_ptr(),
             &*instance as *const _ as *const c_void,
         )
     };
@@ -70,7 +75,7 @@ impl PluginInner for Vst3 {
         }
 
         // " When the controller transmits a parameter change to the host, the host synchronizes
-        //   the processor by passing the new values as Steinberg::Vst::IParameterChanges to the 
+        //   the processor by passing the new values as Steinberg::Vst::IParameterChanges to the
         //   process call. "
         while let Some(param_update) = self.param_updates_for_audio_processor.try_pop() {
             events.push(HostIssuedEvent {
@@ -184,7 +189,7 @@ impl PluginInner for Vst3 {
     }
 
     fn get_latency(&mut self) -> crate::Samples {
-        unsafe { vst3_wrapper_sys::get_latency(self.app) as crate::Samples } 
+        unsafe { vst3_wrapper_sys::get_latency(self.app) as crate::Samples }
     }
 
     fn editor_updates(&mut self) {
@@ -234,4 +239,22 @@ fn last_param_updates(events: &[HostIssuedEvent]) -> Vec<ParameterUpdate> {
     }
 
     updates.values().map(|v| v.param.clone()).collect()
+}
+
+pub fn get_descriptor(path: &Path) -> Vec<PluginDescriptor> {
+    let mut descs = HeaplessVec::<FFIPluginDescriptor, 10>::new();
+    
+    let c_path = path.to_string_lossy().to_string() + "\0";
+    unsafe {
+        vst3_wrapper_sys::get_descriptors(
+            c_path.as_ptr() as *const std::ffi::c_char,
+            &mut descs,
+        );
+    }
+
+    descs
+        .as_slice()
+        .iter()
+        .map(|d| d.to_plugin_descriptor(path))
+        .collect::<Vec<_>>()
 }

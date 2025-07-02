@@ -30,6 +30,27 @@ use vst::{
 
 use super::Common;
 
+pub(crate) fn get_descriptor(path: &Path) -> Option<PluginDescriptor> {
+    let host = NullHost {};
+    let mut loader = vst::host::PluginLoader::load(path, Arc::new(Mutex::new(host))).ok()?;
+
+    let instance = loader.instance().ok()?;
+
+    let info = instance.get_info();
+
+    let descriptor = PluginDescriptor {
+        name: info.name,
+        id: info.unique_id.to_string(),
+        path: path.to_path_buf(),
+        version: info.version.to_string(),
+        vendor: info.vendor,
+        format: Format::Vst2,
+        initial_latency: info.initial_delay as usize,
+    };
+
+    Some(descriptor)
+}
+
 pub(super) fn load(
     path: &Path,
     common: Common,
@@ -687,4 +708,42 @@ impl<const L: usize> Vst2Events<L> {
             events: [std::ptr::null_mut(); L],
         }
     }
+}
+
+struct NullHost {}
+
+impl vst::host::Host for NullHost {
+    fn automate(&self, _index: i32, _value: f32) {}
+
+    fn begin_edit(&self, _index: i32) {}
+
+    fn end_edit(&self, _index: i32) {}
+
+    fn get_info(&self) -> (isize, String, String) {
+        (0, String::new(), String::new())
+    }
+
+    fn get_time_info(&self, _mask: i32) -> Option<vst::api::TimeInfo> {
+        None
+    }
+
+    fn get_block_size(&self) -> isize {
+        0
+    }
+
+    fn update_display(&self) {}
+
+    fn can_do(&self, _can_do: &str) -> isize {
+        1
+    }
+
+    fn get_language(&self) -> i32 {
+        0
+    }
+
+    fn get_process_level(&self) -> i32 {
+        0
+    }
+
+    fn set_size(&self, _width: i32, _height: i32) {}
 }

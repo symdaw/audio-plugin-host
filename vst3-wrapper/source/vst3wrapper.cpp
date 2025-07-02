@@ -187,7 +187,39 @@ PluginInstance::~PluginInstance() { destroy(); }
 
 const int MAX_BLOCK_SIZE = 4096 * 2;
 
-bool PluginInstance::init(const std::string &path) {
+void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plugins) {
+  auto plugin_ctx = owned(NEW HostApplication());
+  PluginContextFactory::instance().setPluginContext(plugin_ctx);
+
+  std::string error;
+  std::cout << path << std::endl;
+  auto module_ = VST3::Hosting::Module::create(path, error);
+  if (!module_) {
+    std::cerr << "Failed to load VST3 module: " << error << std::endl;
+    return;
+  }
+
+  VST3::Hosting::PluginFactory factory = module_->getFactory();
+  for (auto &classInfo : factory.classInfos()) {
+    if (classInfo.category() == kVstAudioEffectClass) {
+      if (plugins->count >= 10) break;
+
+      std::string name = classInfo.name();
+      std::string vendor = classInfo.vendor();
+      std::string version = classInfo.version();
+      std::string id = classInfo.ID().toString();
+
+      plugins->data[plugins->count].value.name = alloc_string(name.c_str());
+      plugins->data[plugins->count].value.version = alloc_string(version.c_str());
+      plugins->data[plugins->count].value.vendor = alloc_string(vendor.c_str());
+      plugins->data[plugins->count].value.id = alloc_string(id.c_str());
+
+      plugins->count++;
+    }
+  }
+}
+
+bool PluginInstance::init(const std::string &path, const std::string &id) {
   _destroy(false);
 
   ++_standardPluginContextRefCount;
@@ -213,11 +245,15 @@ bool PluginInstance::init(const std::string &path) {
   VST3::Hosting::PluginFactory factory = _module->getFactory();
   for (auto &classInfo : factory.classInfos()) {
     if (classInfo.category() == kVstAudioEffectClass) {
+      if (id != classInfo.ID().toString()) continue;
+
       return this->load_plugin_from_class(factory, classInfo);
     }
   }
 
-  return true;
+
+  std::cerr << "No plugin with the provided ID." << error << std::endl;
+  return false;
 }
 
 bool PluginInstance::load_plugin_from_class(
@@ -490,10 +526,11 @@ void PluginInstance::_destroy(bool decrementRefCount) {
 }
 
 const void *load_plugin(const char *s,
+                        const char *id,
                         const void *rust_side_vst3_instance_object) {
   PluginInstance *vst = new PluginInstance();
   vst->rust_side_vst3_instance_object = rust_side_vst3_instance_object;
-  vst->init(s);
+  vst->init(s, id);
 
   vst->_audioEffect->setProcessing(true);
 

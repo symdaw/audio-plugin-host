@@ -15,11 +15,19 @@ fn main() {
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_AUTHORS"),
     );
-    let plugin_path = std::env::args().nth(1).expect("No plugin path provided");
 
-    let mut plugin = plugin::load(&PathBuf::from(plugin_path), &host).unwrap();
+    let plugin_path = PathBuf::from(std::env::args().nth(1).expect("No plugin path provided"));
 
-    println!("Loaded plugin: {:?}", plugin.descriptor);
+    let descriptors = discovery::get_descriptor_from_file(&plugin_path);
+    println!("Plugins in file: {:?}", descriptors);
+
+    let mut plugin = plugin::load(
+        &plugin_path,
+        &descriptors.first().expect("No plugins in file").id,
+        &host,
+    )
+    .unwrap();
+
     println!("IO configuration: {:?}", plugin.get_io_configuration());
 
     let plugin = Arc::new(Mutex::new(plugin));

@@ -13,8 +13,9 @@ use crate::{
 };
 
 /// Loads a plugin of any of the supported formats from the given path and returns a
-/// `PluginInstance`.
-pub fn load<P: AsRef<Path>>(path: P, host: &Host) -> Result<PluginInstance, Error> {
+/// `PluginInstance`. A plugin's `id` can be obtained from `discovery::get_descriptor_from_file(path)[0].id`.
+/// Note that formats such as VST3 allow multiple plugins to be defined in the same file.
+pub fn load<P: AsRef<Path>>(path: P, id: &str, host: &Host) -> Result<PluginInstance, Error> {
     let plugin_issued_events: HeapRb<PluginIssuedEvent> = HeapRb::new(512);
     let (plugin_issued_events_producer, plugin_issued_events_consumer) =
         plugin_issued_events.split();
@@ -24,7 +25,7 @@ pub fn load<P: AsRef<Path>>(path: P, host: &Host) -> Result<PluginInstance, Erro
         plugin_issued_events_producer,
     };
 
-    let (mut inner, descriptor) = crate::formats::load_any(path.as_ref(), common)?;
+    let (mut inner, descriptor) = crate::formats::load_any(path.as_ref(), id, common)?;
 
     let io_configuration = inner.get_io_configuration();
 
@@ -71,7 +72,10 @@ impl PluginInstance {
         process_details: &ProcessDetails,
     ) {
         if let Err(e) = self.io_configuration.matches(inputs, outputs) {
-            panic!("Inputs and outputs do not match the plugin's IO configuration:\n{}", e);
+            panic!(
+                "Inputs and outputs do not match the plugin's IO configuration:\n{}",
+                e
+            );
         }
 
         events.sort_by_key(|e| e.block_time);
