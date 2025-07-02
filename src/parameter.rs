@@ -1,22 +1,25 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use crate::heapless_vec::HeaplessString;
+
+#[repr(C)]
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Parameter {
     pub id: i32,
-    pub name: String,
+    pub name: HeaplessString<256>,
     pub index: i32,
     /// Normalized parameter value in [0.0, 1.0].
     pub value: f32,
     /// Value as string formatted by the plugin. E.g. "0 dB", "50 Hz", etc.
-    pub formatted_value: String,
+    pub formatted_value: HeaplessString<256>,
     pub hidden: bool,
     pub can_automate: bool,
     pub is_wrap_around: bool,
     pub read_only: bool,
     /// Default normalized value if supported by the format. Not supported by VST2.
-    pub default_value: Option<f32>,
+    pub default_value: f32,
 }
 
 #[derive(Debug, Clone)]

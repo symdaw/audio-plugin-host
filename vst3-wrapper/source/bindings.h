@@ -121,16 +121,28 @@ struct HostIssuedEvent {
   uintptr_t bus_index;
 };
 
-struct ParameterFFI {
-  int id;
-  const char *name;
-  int index;
+/// Real-time safe, fixed-size, FFI friendly String.
+/// Call `to_string` or `as_str` to get a normal string type.
+/// N refers to the number of bytes, of characters.
+/// Stored as UTF-8.
+template<uintptr_t N>
+struct HeaplessString {
+  HeaplessVec<uint8_t, N> data;
+};
+
+struct Parameter {
+  int32_t id;
+  HeaplessString<256> name;
+  int32_t index;
+  /// Normalized parameter value in [0.0, 1.0].
   float value;
-  const char *formatted_value;
+  /// Value as string formatted by the plugin. E.g. "0 dB", "50 Hz", etc.
+  HeaplessString<256> formatted_value;
   bool hidden;
   bool can_automate;
   bool is_wrap_around;
   bool read_only;
+  /// Default normalized value if supported by the format. Not supported by VST2.
   float default_value;
 };
 
@@ -190,7 +202,7 @@ extern void process(const void *app,
 
 extern void set_param_in_edit_controller(const void *app, int32_t id, float value);
 
-extern ParameterFFI get_parameter(const void *app, int32_t id);
+extern Parameter get_parameter(const void *app, int32_t id);
 
 extern const void *get_data(const void *app, int32_t *data_len, const void **stream);
 
@@ -205,5 +217,7 @@ extern uint32_t get_latency(const void *app);
 extern void free_string(const char *str);
 
 void send_event_to_host(const PluginIssuedEvent *event, const void *vst3_instance);
+
+bool push_c_str_to_heapless_string(HeaplessString<256> *heapless_string, const char *c_str);
 
 }  // extern "C"

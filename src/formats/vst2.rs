@@ -7,7 +7,7 @@ use crate::discovery::PluginDescriptor;
 use crate::error::err;
 use crate::event::{HostIssuedEvent, HostIssuedEventType, PluginIssuedEvent};
 use crate::formats::Format;
-use crate::heapless_vec::HeaplessVec;
+use crate::heapless_vec::{HeaplessString, HeaplessVec};
 use crate::host::{Host, KnobPreference, Language};
 use crate::parameter::Parameter;
 use crate::plugin::PluginInner;
@@ -303,15 +303,15 @@ impl PluginInner for Vst2 {
 
         Parameter {
             id,
-            name,
+            name: HeaplessString::from_str(&name).unwrap(),
             index: id,
             value,
-            formatted_value,
+            formatted_value: HeaplessString::from_str(&formatted_value).unwrap(),
             hidden: false,
             can_automate,
             is_wrap_around: false,
             read_only: false,
-            default_value: None,
+            default_value: f32::NAN,
         }
     }
 

@@ -30,7 +30,7 @@ extern "C" {
         events_len: i32,
     );
     pub(super) fn set_param_in_edit_controller(app: *const c_void, id: i32, value: f32);
-    pub(super) fn get_parameter(app: *const c_void, id: i32) -> ParameterFFI;
+    pub(super) fn get_parameter(app: *const c_void, id: i32) -> Parameter;
 
     pub(super) fn get_data(
         app: *const c_void,
@@ -91,39 +91,6 @@ impl FFIPluginDescriptor {
 pub(super) struct Dims {
     pub width: std::os::raw::c_int,
     pub height: std::os::raw::c_int,
-}
-
-#[repr(C)]
-#[allow(non_snake_case)]
-#[derive(Debug, Copy, Clone)]
-pub(super) struct ParameterFFI {
-    id: std::os::raw::c_int,
-    name: *const std::os::raw::c_char,
-    index: std::os::raw::c_int,
-    value: std::os::raw::c_float,
-    formatted_value: *const std::os::raw::c_char,
-    hidden: bool,
-    can_automate: bool,
-    is_wrap_around: bool,
-    read_only: bool,
-    default_value: std::os::raw::c_float,
-}
-
-impl ParameterFFI {
-    pub fn to_parameter(self) -> Parameter {
-        crate::parameter::Parameter {
-            id: self.id,
-            name: load_and_free_c_string(self.name),
-            index: self.index,
-            value: self.value,
-            formatted_value: load_and_free_c_string(self.formatted_value),
-            hidden: self.hidden,
-            can_automate: self.can_automate,
-            is_wrap_around: self.is_wrap_around,
-            read_only: self.read_only,
-            default_value: Some(self.default_value as f32),
-        }
-    }
 }
 
 fn load_and_free_c_string(s: *const c_char) -> String {

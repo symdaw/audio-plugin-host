@@ -356,6 +356,7 @@ bool PluginInstance::load_plugin_from_class(
 void PluginInstance::destroy() { _destroy(true); }
 
 uint32_t get_latency(const void* app) {
+  // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Workflow+Diagrams/Get+Latency+Call+Sequence.html
   PluginInstance *vst = (PluginInstance *)app;
   vst->_audioEffect->setProcessing(false);
   vst->_vstPlug->setActive(false);
@@ -785,7 +786,7 @@ void set_param_in_edit_controller(const void *app, int32_t id, float value) {
 
 void free_string(const char *str) { delete[] str; }
 
-ParameterFFI get_parameter(const void *app, int32_t id) {
+Parameter get_parameter(const void *app, int32_t id) {
   // TODO: sort out naming confusion with id and index
 
   PluginInstance *vst = (PluginInstance *)app;
@@ -820,16 +821,20 @@ ParameterFFI get_parameter(const void *app, int32_t id) {
     }
   }
 
-  ParameterFFI param = {};
+  Parameter param = {};
   param.id = param_info.id;
   param.index = id;
   param.value = (float)value;
-  param.name = alloc_string(name.c_str());
-  param.formatted_value = alloc_string(formatted_value_c_str.c_str());
+
+  push_c_str_to_heapless_string(&param.name, name.c_str());
+
+  push_c_str_to_heapless_string(&param.formatted_value, formatted_value_c_str.c_str());
+
   param.is_wrap_around = (param_info.flags & ParameterInfo::kIsWrapAround) != 0;
   param.hidden = (param_info.flags & ParameterInfo::kIsHidden) != 0;
   param.can_automate = (param_info.flags & ParameterInfo::kCanAutomate) != 0;
   param.read_only = (param_info.flags & ParameterInfo::kIsReadOnly) != 0;
+
   param.default_value = (float)param_info.defaultNormalizedValue;
 
   return param;

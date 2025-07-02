@@ -158,7 +158,7 @@ impl PluginInner for Vst3 {
     }
 
     fn get_parameter(&self, id: i32) -> crate::parameter::Parameter {
-        unsafe { get_parameter(self.app, id) }.to_parameter()
+        unsafe { get_parameter(self.app, id) }
     }
 
     fn show_editor(&mut self, window_id: *mut std::ffi::c_void) -> Result<(usize, usize), Error> {

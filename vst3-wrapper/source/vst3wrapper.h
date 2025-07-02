@@ -8,6 +8,8 @@
 #include "public.sdk/source/vst/hosting/plugprovider.h"
 
 #include "memoryibstream.h"
+#include "stringconvert.h"
+
 #include <pluginterfaces/gui/iplugview.h>
 #include <public.sdk/source/vst/hosting/eventlist.h>
 #include <public.sdk/source/vst/hosting/parameterchanges.h>
