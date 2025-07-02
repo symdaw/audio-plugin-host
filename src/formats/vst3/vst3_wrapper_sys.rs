@@ -43,6 +43,7 @@ extern "C" {
     pub(super) fn free_data_stream(stream: *const c_void);
     pub(super) fn set_data(app: *const c_void, data: *const c_void, data_len: i32);
     pub(super) fn set_processing(app: *const c_void, processing: bool);
+    pub(super) fn get_latency(app: *const c_void) -> u32;
 
     fn free_string(str: *const c_char);
 }
