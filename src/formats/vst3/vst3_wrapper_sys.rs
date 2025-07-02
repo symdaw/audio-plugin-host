@@ -8,17 +8,14 @@ use ringbuf::{traits::Producer, HeapProd};
 use crate::{
     audio_bus::IOConfigutaion,
     event::{HostIssuedEvent, PluginIssuedEvent},
-    formats::{Format, PluginDescriptor},
+    formats::{vst3::Vst3, Format, PluginDescriptor},
     parameter::Parameter,
     ProcessDetails,
 };
 
 #[link(name = "vst3wrapper", kind = "static")]
 extern "C" {
-    pub(super) fn load_plugin(
-        s: *const c_char,
-        plugin_sent_events_producer: *const c_void,
-    ) -> *const c_void;
+    pub(super) fn load_plugin(s: *const c_char, vst3_instance: *const c_void) -> *const c_void;
     pub(super) fn show_gui(app: *const c_void, window_id: *const c_void) -> Dims;
     pub(super) fn hide_gui(app: *const c_void);
     pub(super) fn descriptor(app: *const c_void) -> FFIPluginDescriptor;
@@ -51,12 +48,16 @@ extern "C" {
 #[no_mangle]
 pub extern "C" fn send_event_to_host(
     event: *const PluginIssuedEvent,
-    plugin_sent_events_producer: *const c_void,
+    vst3_instance: *const c_void,
 ) {
     let event = unsafe { &*event };
-    let producer =
-        unsafe { &mut *(plugin_sent_events_producer as *mut HeapProd<PluginIssuedEvent>) };
-    let _ = producer.try_push(event.clone());
+    let vst3 = unsafe { &mut *(vst3_instance as *mut Vst3) };
+
+    if let PluginIssuedEvent::Parameter(p) = event {
+        let _ = vst3.param_updates_for_audio_processor.try_push(p.clone());
+    }
+
+    let _ = vst3._plugin_issued_events_producer.try_push(event.clone());
 }
 
 #[repr(C)]

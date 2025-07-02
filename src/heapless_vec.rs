@@ -151,5 +151,3 @@ impl<T: Copy, const N: usize> Index<usize> for HeaplessVec<T, N> {
 pub struct HeaplessString<const N: usize> {
     data: HeaplessVec<u8, N>
 }
-
-// impl<const N: usize> 

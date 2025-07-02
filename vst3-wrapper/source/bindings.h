@@ -169,7 +169,7 @@ struct PluginIssuedEvent {
 
 extern "C" {
 
-extern const void *load_plugin(const char *s, const void *plugin_sent_events_producer);
+extern const void *load_plugin(const char *s, const void *vst3_instance);
 
 extern Dims show_gui(const void *app, const void *window_id);
 
@@ -204,6 +204,6 @@ extern uint32_t get_latency(const void *app);
 
 extern void free_string(const char *str);
 
-void send_event_to_host(const PluginIssuedEvent *event, const void *plugin_sent_events_producer);
+void send_event_to_host(const PluginIssuedEvent *event, const void *vst3_instance);
 
 }  // extern "C"

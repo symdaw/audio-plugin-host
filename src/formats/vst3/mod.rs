@@ -23,6 +23,7 @@ struct Vst3 {
     app: *const c_void,
     _plugin_issued_events_producer: Box<HeapProd<PluginIssuedEvent>>,
     param_updates_for_edit_controller: HeapRb<ParameterUpdate>,
+    param_updates_for_audio_processor: HeapRb<ParameterUpdate>,
 }
 
 pub fn load(
@@ -31,22 +32,27 @@ pub fn load(
 ) -> Result<(Box<dyn PluginInner>, PluginDescriptor), Error> {
     let plugin_issued_events_producer = Box::new(common.plugin_issued_events_producer);
 
+    let instance = Vst3 {
+        app: std::ptr::null(),
+        _plugin_issued_events_producer: plugin_issued_events_producer,
+        param_updates_for_edit_controller: HeapRb::new(512),
+        param_updates_for_audio_processor: HeapRb::new(512),
+    };
+
+    let mut instance = Box::new(instance);
+
     let app = unsafe {
         let plugin_path = std::ffi::CString::new(path.to_str().unwrap()).unwrap();
         vst3_wrapper_sys::load_plugin(
             plugin_path.as_ptr(),
-            &*plugin_issued_events_producer as *const _ as *const c_void,
+            &*instance as *const _ as *const c_void,
         )
     };
 
-    let descriptor = unsafe { descriptor(app) }.to_plugin_descriptor(path);
-    let processor = Vst3 {
-        app,
-        _plugin_issued_events_producer: plugin_issued_events_producer,
-        param_updates_for_edit_controller: HeapRb::new(512),
-    };
+    instance.app = app;
 
-    Ok((Box::new(processor), descriptor))
+    let descriptor = unsafe { descriptor(app) }.to_plugin_descriptor(path);
+    Ok((instance, descriptor))
 }
 
 impl PluginInner for Vst3 {
@@ -57,8 +63,22 @@ impl PluginInner for Vst3 {
         mut events: Vec<HostIssuedEvent>,
         process_details: &ProcessDetails,
     ) {
+        // Queue parameters to be sent to the IEditController because they need to be sent to both
+        // the IEditController and IAudioProcessor separately.
         for update in last_param_updates(&events) {
             let _ = self.param_updates_for_edit_controller.try_push(update);
+        }
+
+        // " When the controller transmits a parameter change to the host, the host synchronizes
+        //   the processor by passing the new values as Steinberg::Vst::IParameterChanges to the 
+        //   process call. "
+        while let Some(param_update) = self.param_updates_for_audio_processor.try_pop() {
+            events.push(HostIssuedEvent {
+                block_time: 0,
+                ppq_time: process_details.player_time,
+                bus_index: 0,
+                event_type: HostIssuedEventType::Parameter(param_update),
+            });
         }
 
         // TODO: Make real-time safe
