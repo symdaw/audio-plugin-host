@@ -200,6 +200,8 @@ extern void set_data(const void *app, const void *data, int32_t data_len);
 
 extern void set_processing(const void *app, bool processing);
 
+extern uint32_t get_latency(const void *app);
+
 extern void free_string(const char *str);
 
 void send_event_to_host(const PluginIssuedEvent *event, const void *plugin_sent_events_producer);

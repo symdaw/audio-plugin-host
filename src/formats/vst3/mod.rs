@@ -164,7 +164,7 @@ impl PluginInner for Vst3 {
     }
 
     fn get_latency(&mut self) -> crate::Samples {
-        0
+        unsafe { vst3_wrapper_sys::get_latency(self.app) as crate::Samples } 
     }
 
     fn editor_updates(&mut self) {

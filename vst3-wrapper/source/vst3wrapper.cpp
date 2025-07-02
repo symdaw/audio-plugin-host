@@ -355,6 +355,16 @@ bool PluginInstance::load_plugin_from_class(
 
 void PluginInstance::destroy() { _destroy(true); }
 
+uint32_t get_latency(const void* app) {
+  PluginInstance *vst = (PluginInstance *)app;
+  vst->_audioEffect->setProcessing(false);
+  vst->_vstPlug->setActive(false);
+  vst->_vstPlug->setActive(true);
+  uint32_t latency = vst->_audioEffect->getLatencySamples();
+  vst->_audioEffect->setProcessing(true);
+  return latency;
+}
+
 void set_processing(const void *app, bool processing) {
   PluginInstance *vst = (PluginInstance *)app;
   vst->_audioEffect->setProcessing(processing);
