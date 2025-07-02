@@ -48,8 +48,6 @@ public:
   bool load_plugin_from_class(VST3::Hosting::PluginFactory &factory,
                               VST3::Hosting::ClassInfo &classInfo);
 
-  Dims createView(void *window_id);
-
   Steinberg::Vst::HostProcessData _processData = {};
 
   std::unordered_map<Steinberg::Vst::ParamID, int> parameter_indicies = {};
@@ -87,7 +85,7 @@ public:
   std::string version;
   std::string id;
 
-  const void *plugin_sent_events_producer = nullptr;
+  const void *rust_side_vst3_instance_object = nullptr;
 
   static Steinberg::Vst::HostApplication *_standardPluginContext;
   static int _standardPluginContextRefCount;

@@ -19,7 +19,7 @@ const char *alloc_string(const char *str) {
 }
 
 void send_param_change_event(
-    const void *plugin_sent_events_producer, int32_t id, float value,
+    const void *rust_side_vst3_instance_object, int32_t id, float value,
     float initial_value,
     const std::unordered_map<ParamID, int> *parameter_indicies,
     bool end_edit = false) {
@@ -41,15 +41,15 @@ void send_param_change_event(
   event.parameter._0.current_value = value,
   event.parameter._0.end_edit = end_edit,
   event.parameter._0.initial_value = initial_value,
-  send_event_to_host(&event, plugin_sent_events_producer);
+  send_event_to_host(&event, rust_side_vst3_instance_object);
 }
 
 class PlugFrame : public Steinberg::IPlugFrame {
 public:
-  const void *plugin_sent_events_producer = nullptr;
+  const void *rust_side_vst3_instance_object = nullptr;
 
-  PlugFrame(const void *_plugin_sent_events_producer) {
-    plugin_sent_events_producer = _plugin_sent_events_producer;
+  PlugFrame(const void *_rust_side_vst3_instance_object) {
+    rust_side_vst3_instance_object = _rust_side_vst3_instance_object;
   }
 
   Steinberg::tresult resizeView(Steinberg::IPlugView *view,
@@ -60,7 +60,7 @@ public:
     event.resize_window._0 = (uintptr_t)newSize->getWidth();
     event.resize_window._1 = (uintptr_t)newSize->getHeight();
 
-    send_event_to_host(&event, plugin_sent_events_producer);
+    send_event_to_host(&event, rust_side_vst3_instance_object);
 
     return Steinberg::kResultOk;
   }
@@ -79,16 +79,16 @@ class ComponentHandler : public Steinberg::Vst::IComponentHandler {
 public:
   std::vector<ParameterEditState> *param_edits = nullptr;
   std::mutex *param_edits_mutex = nullptr;
-  const void *plugin_sent_events_producer = nullptr;
+  const void *rust_side_vst3_instance_object = nullptr;
   const std::unordered_map<ParamID, int> *parameter_indicies = nullptr;
 
   ComponentHandler(
       std::vector<ParameterEditState> *_param_edits,
-      std::mutex *_param_edits_mutex, const void *_plugin_sent_events_producer,
+      std::mutex *_param_edits_mutex, const void *_rust_side_vst3_instance_object,
       const std::unordered_map<ParamID, int> *_parameter_indicies) {
     param_edits = _param_edits;
     param_edits_mutex = _param_edits_mutex;
-    plugin_sent_events_producer = _plugin_sent_events_producer;
+    rust_side_vst3_instance_object = _rust_side_vst3_instance_object;
     parameter_indicies = _parameter_indicies;
   }
 
@@ -113,7 +113,7 @@ public:
 
       param.current_value = valueNormalized;
 
-      send_param_change_event(plugin_sent_events_producer, id, valueNormalized,
+      send_param_change_event(rust_side_vst3_instance_object, id, valueNormalized,
                               param.initial_value, parameter_indicies);
 
       return Steinberg::kResultOk;
@@ -127,7 +127,7 @@ public:
 
     param_edits->push_back(state);
 
-    send_param_change_event(plugin_sent_events_producer, id, valueNormalized,
+    send_param_change_event(rust_side_vst3_instance_object, id, valueNormalized,
                             valueNormalized, parameter_indicies);
 
     return Steinberg::kResultOk;
@@ -141,7 +141,7 @@ public:
       if (param.id != id)
         continue;
 
-      send_param_change_event(plugin_sent_events_producer, param.id,
+      send_param_change_event(rust_side_vst3_instance_object, param.id,
                               param.current_value, param.initial_value,
                               parameter_indicies, true);
 
@@ -150,7 +150,7 @@ public:
       return Steinberg::kResultOk;
     }
 
-    send_param_change_event(plugin_sent_events_producer, id, NAN, NAN,
+    send_param_change_event(rust_side_vst3_instance_object, id, NAN, NAN,
                             parameter_indicies, true);
 
     return Steinberg::kResultOk;
@@ -161,7 +161,7 @@ public:
 
     PluginIssuedEvent event = {};
     event.tag = PluginIssuedEvent::Tag::IOChanged;
-    send_event_to_host(&event, plugin_sent_events_producer);
+    send_event_to_host(&event, rust_side_vst3_instance_object);
 
     return Steinberg::kResultOk;
   }
@@ -206,7 +206,7 @@ bool PluginInstance::init(const std::string &path) {
   std::string error;
   _module = VST3::Hosting::Module::create(path, error);
   if (!_module) {
-    std::cout << "Failed to load VST3 module: " << error << std::endl;
+    std::cerr << "Failed to load VST3 module: " << error << std::endl;
     return false;
   }
 
@@ -246,7 +246,7 @@ bool PluginInstance::load_plugin_from_class(
 
   component_handler =
       new ComponentHandler(&param_edits, &param_edits_mutex,
-                           plugin_sent_events_producer, &parameter_indicies);
+                           rust_side_vst3_instance_object, &parameter_indicies);
   _editController->setComponentHandler((ComponentHandler *)component_handler);
 
   Vst::IConnectionPoint *iConnectionPointComponent = nullptr;
@@ -401,53 +401,6 @@ PluginInstance::parameterChanges(Steinberg::Vst::BusDirection direction,
   }
 }
 
-Dims PluginInstance::createView(void *window_id) {
-  if (!_editController) {
-    std::cout << "VST does not provide an edit controller" << std::endl;
-    return {};
-  }
-
-  if (!_view) {
-    _view = _editController->createView(ViewType::kEditor);
-    if (!_view) {
-      std::cout << "EditController does not provide its own view" << std::endl;
-      return {};
-    }
-
-    _view->setFrame(owned(new PlugFrame(plugin_sent_events_producer)));
-  }
-
-#ifdef _WIN32
-  if (_view->isPlatformTypeSupported(Steinberg::kPlatformTypeHWND) !=
-      Steinberg::kResultTrue) {
-    std::cout << "Editor view does not support HWND" << std::endl;
-    return {};
-  }
-#else
-  std::cout << "Platform is not supported yet" << std::endl;
-  return false;
-#endif
-
-#ifdef _WIN32
-  if (_view->attached(window_id, Steinberg::kPlatformTypeHWND) !=
-      Steinberg::kResultOk) {
-    std::cout << "Failed to attach editor view to HWND" << std::endl;
-    return {};
-  }
-#endif
-
-  ViewRect viewRect = {};
-  if (_view->getSize(&viewRect) != kResultOk) {
-    std::cout << "Failed to get editor view size" << std::endl;
-    return {};
-  }
-
-  return {
-      viewRect.getWidth(),
-      viewRect.getHeight(),
-  };
-}
-
 IOConfigutaion PluginInstance::get_io_config() {
   IOConfigutaion io_config = {};
   io_config.audio_inputs = {};
@@ -536,9 +489,9 @@ void PluginInstance::_destroy(bool decrementRefCount) {
 }
 
 const void *load_plugin(const char *s,
-                        const void *plugin_sent_events_producer) {
+                        const void *rust_side_vst3_instance_object) {
   PluginInstance *vst = new PluginInstance();
-  vst->plugin_sent_events_producer = plugin_sent_events_producer;
+  vst->rust_side_vst3_instance_object = rust_side_vst3_instance_object;
   vst->init(s);
 
   vst->_audioEffect->setProcessing(true);
@@ -566,7 +519,48 @@ const void *load_plugin(const char *s,
 Dims show_gui(const void *app, const void *window_id) {
   PluginInstance *vst = (PluginInstance *)app;
 
-  return vst->createView((void *)window_id);
+  if (!vst->_editController) {
+    std::cerr << "VST does not provide an edit controller" << std::endl;
+    return {};
+  }
+
+  if (!vst->_view) {
+    vst->_view = vst->_editController->createView(ViewType::kEditor);
+    if (!vst->_view) {
+      std::cerr << "EditController does not provide its own view" << std::endl;
+      return {};
+    }
+
+    vst->_view->setFrame(owned(new PlugFrame(vst->rust_side_vst3_instance_object)));
+  }
+
+#ifdef _WIN32
+  if (vst->_view->isPlatformTypeSupported(Steinberg::kPlatformTypeHWND) !=
+      Steinberg::kResultTrue) {
+    std::cerr << "Editor view does not support HWND" << std::endl;
+    return {};
+  }
+
+  if (vst->_view->attached((void *)window_id, Steinberg::kPlatformTypeHWND) !=
+      Steinberg::kResultOk) {
+    std::cout << "Failed to attach editor view to HWND" << std::endl;
+    return {};
+  }
+#else
+  std::cout << "Platform is not supported yet" << std::endl;
+  return false;
+#endif
+
+  ViewRect viewRect = {};
+  if (vst->_view->getSize(&viewRect) != kResultOk) {
+    std::cout << "Failed to get editor view size" << std::endl;
+    return {};
+  }
+
+  return {
+    viewRect.getWidth(),
+    viewRect.getHeight(),
+  };
 }
 
 void hide_gui(const void *app) {
