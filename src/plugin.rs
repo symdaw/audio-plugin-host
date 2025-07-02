@@ -7,7 +7,6 @@ use crate::{
     discovery::PluginDescriptor,
     error::{err, Error},
     event::{HostIssuedEvent, PluginIssuedEvent},
-    heapless_vec::HeaplessVec,
     host::Host,
     parameter::Parameter,
     BlockSize, ProcessDetails, SampleRate, Samples,
@@ -68,12 +67,14 @@ impl PluginInstance {
         &mut self,
         inputs: &Vec<AudioBus<f32>>,
         outputs: &mut Vec<AudioBus<f32>>,
-        events: Vec<HostIssuedEvent>,
+        mut events: Vec<HostIssuedEvent>,
         process_details: &ProcessDetails,
     ) {
         if let Err(e) = self.io_configuration.matches(inputs, outputs) {
             panic!("Inputs and outputs do not match the plugin's IO configuration:\n{}", e);
         }
+
+        events.sort_by_key(|e| e.block_time);
 
         self.resume();
 

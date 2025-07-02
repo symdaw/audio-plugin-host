@@ -213,11 +213,23 @@ impl PluginInner for Vst2 {
             *details_lock = process_details.clone();
         }
 
-        for event in &events {
-            if let HostIssuedEventType::Parameter(ref param) = event.event_type {
+        // Events are sorted by time.
+        // Since sample-accurate parameters are not supported we want to only take the last value
+        // for each parameter. Loop from last to first skipping anything we've already seen.
+        let mut seen = HeaplessVec::<i32, 300>::new();
+        for i in 0..events.len() {
+            if let HostIssuedEventType::Parameter(ref param) =
+                unsafe { events.get_unchecked(events.len() - 1 - i) }.event_type
+            {
+                if seen.contains(param.parameter_id) {
+                    continue;
+                }
+
                 self.plugin_instance
                     .get_parameter_object()
                     .set_parameter(param.parameter_id, param.current_value);
+
+                let _ = seen.push(param.parameter_id);
             }
         }
 
@@ -328,29 +340,37 @@ impl PluginInner for Vst2 {
             // works for most plugins.
 
             outputs.clear();
-            inputs.clear(); 
+            inputs.clear();
 
             match info.inputs {
                 0 => {}
                 1 | 2 => {
                     // Mono or stereo
-                    let _ = inputs.push(AudioBusDescriptor { channels: info.inputs as usize });
+                    let _ = inputs.push(AudioBusDescriptor {
+                        channels: info.inputs as usize,
+                    });
                 }
                 _ => {
                     let _ = inputs.push(AudioBusDescriptor { channels: 2 });
-                    let _ = inputs.push(AudioBusDescriptor { channels: info.inputs as usize - 2 });
+                    let _ = inputs.push(AudioBusDescriptor {
+                        channels: info.inputs as usize - 2,
+                    });
                 }
             }
             match info.outputs {
                 0 => {}
                 1 | 2 => {
                     // Mono or stereo
-                    let _ = outputs.push(AudioBusDescriptor { channels: info.outputs as usize });
+                    let _ = outputs.push(AudioBusDescriptor {
+                        channels: info.outputs as usize,
+                    });
                 }
                 _ => {
                     // Stereo with sidechain
                     let _ = outputs.push(AudioBusDescriptor { channels: 2 });
-                    let _ = outputs.push(AudioBusDescriptor { channels: info.outputs as usize - 2 });
+                    let _ = outputs.push(AudioBusDescriptor {
+                        channels: info.outputs as usize - 2,
+                    });
                 }
             }
         }
@@ -387,7 +407,7 @@ fn append_bus_info_from_arrangment(
             let _ = buses.push(AudioBusDescriptor { channels: 1 });
         }
         vst::channels::SpeakerArrangementType::Stereo(_, channel) => {
-            // Assume right will also be present and ignore it
+            // Assume left will also be present and ignore it
             if channel == StereoChannel::Right {
                 let _ = buses.push(AudioBusDescriptor { channels: 2 });
             }

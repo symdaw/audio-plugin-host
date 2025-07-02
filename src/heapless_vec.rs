@@ -104,6 +104,13 @@ impl<T: Copy, const N: usize> HeaplessVec<T, N> {
             self.pop();
         }
     }
+
+}
+
+impl<T: Copy + PartialEq, const N: usize> HeaplessVec<T, N> {
+    pub fn contains(&self, item: T) -> bool {
+        !self.iter().all(|i| *i != item)
+    }
 }
 
 pub struct HeaplessVecIter<'a, T: Copy, const N: usize> {
@@ -136,3 +143,13 @@ impl<T: Copy, const N: usize> Index<usize> for HeaplessVec<T, N> {
         }
     }
 }
+
+#[repr(C)]
+#[derive(Clone)]
+/// Real-time safe, fixed-size, FFI friendly String.
+/// N refers to the number of bytes. Not the number of characters.
+pub struct HeaplessString<const N: usize> {
+    data: HeaplessVec<u8, N>
+}
+
+// impl<const N: usize> 
