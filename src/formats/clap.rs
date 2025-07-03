@@ -486,10 +486,6 @@ impl PluginInner for Clap {
                     new_event.header.flags |= CLAP_EVENT_IS_LIVE;
                 }
 
-                if event.dont_record {
-                    new_event.header.flags |= CLAP_EVENT_DONT_RECORD;
-                }
-
                 match event.event_type {
                     crate::event::HostIssuedEventType::Midi(midi_event) => {
                         match midi_event.midi_data[0] {

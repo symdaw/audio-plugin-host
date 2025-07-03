@@ -10,8 +10,8 @@ pub struct HostIssuedEvent {
     pub block_time: Samples,
     pub ppq_time: PpqTime,
     pub bus_index: usize,
+    /// Whether event was issued from a live input (e.g. MIDI controller).
     pub is_live: bool,
-    pub dont_record: bool,
 }
 
 #[repr(C)]

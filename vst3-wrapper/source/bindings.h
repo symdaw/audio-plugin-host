@@ -119,8 +119,8 @@ struct HostIssuedEvent {
   Samples block_time;
   PpqTime ppq_time;
   uintptr_t bus_index;
+  /// Whether event was issued from a live input (e.g. MIDI controller).
   bool is_live;
-  bool dont_record;
 };
 
 /// Real-time safe, fixed-size, FFI friendly String.
