@@ -78,4 +78,32 @@ impl PlayingState {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum WindowIDType {
+    HWND, 
+    XWNDX11,
+    XWNDWayland,
+    NSView,
+    Other,
+}
+
+impl WindowIDType {
+    pub fn this_platform() -> Self {
+        #[cfg(target_os = "windows")]
+        {
+            WindowIDType::HWND
+        }
+        #[cfg(target_os = "linux")]
+        {
+            // TODO: Check Wayland
+            WindowIDType::XWNDX11
+        }
+        #[cfg(target_os = "macos")]
+        {
+            WindowIDType::NSView
+        }
+    }
+}
+
 ///////////////////////

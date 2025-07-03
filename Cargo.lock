@@ -57,8 +57,10 @@ name = "audio-plugin-host"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
+ "clap-sys",
  "cmake",
  "goblin",
+ "libloading 0.8.8",
  "ringbuf",
  "serde",
  "vst",
@@ -124,6 +126,12 @@ checksum = "d8aa86934b44c19c50f87cc2790e19f54f7a67aedb64101c2e1a2e5ecfb73944"
 dependencies = [
  "clap_builder",
 ]
+
+[[package]]
+name = "clap-sys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a76abbdb2907f6fd97fb6bc0b7be96b77d328f2dd9669d1075cc03369ed22154"
 
 [[package]]
 name = "clap_builder"
@@ -257,6 +265,16 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
+]
+
+[[package]]
+name = "libloading"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
+dependencies = [
+ "cfg-if",
+ "windows-targets",
 ]
 
 [[package]]
@@ -569,7 +587,7 @@ version = "999.0.0"
 dependencies = [
  "bitflags 1.3.2",
  "libc",
- "libloading",
+ "libloading 0.7.4",
  "log",
  "num-traits",
  "num_enum",

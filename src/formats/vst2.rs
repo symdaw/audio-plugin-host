@@ -12,7 +12,7 @@ use crate::host::{Host, KnobPreference, Language};
 use crate::parameter::Parameter;
 use crate::plugin::PluginInner;
 use crate::{error::Error, SampleRate};
-use crate::{BlockSize, PlayingState, ProcessDetails};
+use crate::{BlockSize, PlayingState, ProcessDetails, WindowIDType};
 
 use std::sync::{atomic::AtomicBool, Arc};
 
@@ -170,7 +170,7 @@ impl PluginInner for Vst2 {
         self.state = Vst2State::Resumed;
     }
 
-    fn show_editor(&mut self, window_id: *mut std::ffi::c_void) -> Result<(usize, usize), Error> {
+    fn show_editor(&mut self, window_id: *mut std::ffi::c_void, _window_id_type: WindowIDType) -> Result<(usize, usize), Error> {
         if self.editor.is_none() {
             let Some(editor) = self.plugin_instance.get_editor() else {
                 return err("Plugin does not have an editor".to_string());

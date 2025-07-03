@@ -1,5 +1,8 @@
+/// cbindgen:ignore
 pub(crate) mod clap;
+
 pub(crate) mod vst2;
+
 pub(crate) mod vst3;
 
 use std::path::Path;
@@ -26,7 +29,7 @@ pub fn load_any(
     }
 
     if is_clap(path) {
-        return clap::load(path);
+        return clap::load(path, id, common);
     }
 
     err("The requested path was not a supported plugin format.")

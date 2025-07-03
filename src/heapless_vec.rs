@@ -110,19 +110,19 @@ impl<T: Copy, const N: usize> HeaplessVec<T, N> {
     }
 
     pub fn clear(&mut self) {
-        while !self.is_empty() {
-            self.pop();
-        }
+        self.count = 0;
+
+        // while !self.is_empty() {
+        //     self.pop();
+        // }
     }
 
     pub fn as_slice(&self) -> &[T] {
-        // Faily sure this won't break...
-        unsafe {
-            std::slice::from_raw_parts(
-                self.data.as_ptr() as *const _,
-                self.len(),
-            )
-        }
+        unsafe { std::slice::from_raw_parts(self.data.as_ptr() as *const _, self.len()) }
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self.data.as_mut_ptr() as *mut T
     }
 }
 
@@ -196,6 +196,10 @@ impl<const N: usize> HeaplessString<N> {
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(self.data.as_slice()).expect("Invalid UTF-8")
     }
+
+    pub(crate) fn data_raw(&self) -> *const u8 {
+        self.data.as_slice().as_ptr()
+    }
 }
 
 impl<const N: usize> Default for HeaplessString<N> {
@@ -209,7 +213,7 @@ impl<const N: usize> Debug for HeaplessString<N> {
         write!(f, "\"{}\"", self.as_str())
     }
 }
- 
+
 impl<const N: usize> ToString for HeaplessString<N> {
     fn to_string(&self) -> String {
         self.as_str().to_string()
@@ -257,7 +261,7 @@ pub unsafe extern "C" fn push_c_str_to_heapless_string(
         eprintln!("Error: Invalid UTF-8 string passed to push_c_str_to_heapless_string");
         return false;
     };
-    
+
     if (*heapless_string).push_str(s).is_err() {
         eprintln!("Error: HeaplessString was full.");
         return false;

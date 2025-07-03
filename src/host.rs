@@ -3,6 +3,7 @@ pub struct Host {
     pub name: &'static str,
     pub version: &'static str,
     pub vendor: &'static str,
+    pub url: &'static str,
     pub knob_preference: Option<KnobPreference>,
     pub language: Option<Language>,
 }

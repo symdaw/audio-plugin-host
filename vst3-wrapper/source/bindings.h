@@ -119,6 +119,8 @@ struct HostIssuedEvent {
   Samples block_time;
   PpqTime ppq_time;
   uintptr_t bus_index;
+  bool is_live;
+  bool dont_record;
 };
 
 /// Real-time safe, fixed-size, FFI friendly String.
@@ -156,6 +158,8 @@ struct PluginIssuedEvent {
     Parameter,
     UpdateDisplay,
     IOChanged,
+    RequestEditorOpen,
+    RequestEditorClose,
   };
 
   struct ChangeLatency_Body {

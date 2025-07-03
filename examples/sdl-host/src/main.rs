@@ -41,7 +41,7 @@ fn main() {
         .unwrap();
     let window_id = get_window_id(&window);
 
-    let (width, height) = plugin.lock().unwrap().show_editor(window_id).unwrap();
+    let (width, height) = plugin.lock().unwrap().show_editor(window_id, WindowIDType::this_platform()).unwrap();
     window.set_size(width as u32, height as u32).unwrap();
 
     loop {

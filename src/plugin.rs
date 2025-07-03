@@ -9,7 +9,7 @@ use crate::{
     event::{HostIssuedEvent, PluginIssuedEvent},
     host::Host,
     parameter::Parameter,
-    BlockSize, ProcessDetails, SampleRate, Samples,
+    BlockSize, ProcessDetails, SampleRate, Samples, WindowIDType,
 };
 
 /// Loads a plugin of any of the supported formats from the given path and returns a
@@ -171,12 +171,13 @@ impl PluginInstance {
     pub fn show_editor(
         &mut self,
         window_id: *mut std::ffi::c_void,
+        window_id_type: WindowIDType,
     ) -> Result<(usize, usize), Error> {
         if self.showing_editor {
             return err("Editor is already open");
         }
 
-        let size = self.inner.show_editor(window_id)?;
+        let size = self.inner.show_editor(window_id, window_id_type)?;
 
         self.showing_editor = true;
 
@@ -246,7 +247,7 @@ pub(crate) trait PluginInner {
 
     fn get_parameter(&self, index: i32) -> Parameter;
 
-    fn show_editor(&mut self, window_id: *mut std::ffi::c_void) -> Result<(usize, usize), Error>;
+    fn show_editor(&mut self, window_id: *mut std::ffi::c_void, window_id_type: WindowIDType) -> Result<(usize, usize), Error>;
     fn hide_editor(&mut self);
 
     fn change_sample_rate(&mut self, _rate: SampleRate) {}

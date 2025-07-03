@@ -15,7 +15,7 @@ use crate::formats::vst3::vst3_wrapper_sys::FFIPluginDescriptor;
 use crate::heapless_vec::HeaplessVec;
 use crate::parameter::ParameterUpdate;
 use crate::plugin::PluginInner;
-use crate::{ProcessDetails, Samples};
+use crate::{ProcessDetails, Samples, WindowIDType};
 
 use super::Common;
 
@@ -79,10 +79,9 @@ impl PluginInner for Vst3 {
         //   process call. "
         while let Some(param_update) = self.param_updates_for_audio_processor.try_pop() {
             events.push(HostIssuedEvent {
-                block_time: 0,
                 ppq_time: process_details.player_time,
-                bus_index: 0,
                 event_type: HostIssuedEventType::Parameter(param_update),
+                ..HostIssuedEvent::default()
             });
         }
 
@@ -166,7 +165,11 @@ impl PluginInner for Vst3 {
         unsafe { get_parameter(self.app, id) }
     }
 
-    fn show_editor(&mut self, window_id: *mut std::ffi::c_void) -> Result<(usize, usize), Error> {
+    fn show_editor(
+        &mut self,
+        window_id: *mut std::ffi::c_void,
+        _window_id_type: WindowIDType,
+    ) -> Result<(usize, usize), Error> {
         let dims = unsafe { vst3_wrapper_sys::show_gui(self.app, window_id as *const c_void) };
 
         Ok((dims.width as usize, dims.height as usize))
@@ -243,13 +246,10 @@ fn last_param_updates(events: &[HostIssuedEvent]) -> Vec<ParameterUpdate> {
 
 pub fn get_descriptor(path: &Path) -> Vec<PluginDescriptor> {
     let mut descs = HeaplessVec::<FFIPluginDescriptor, 10>::new();
-    
+
     let c_path = path.to_string_lossy().to_string() + "\0";
     unsafe {
-        vst3_wrapper_sys::get_descriptors(
-            c_path.as_ptr() as *const std::ffi::c_char,
-            &mut descs,
-        );
+        vst3_wrapper_sys::get_descriptors(c_path.as_ptr() as *const std::ffi::c_char, &mut descs);
     }
 
     descs

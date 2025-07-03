@@ -54,7 +54,7 @@ plugin.process(
 ```rust
 // Main thread
 
-let (width, height) = plugin.show_editor(window_id).unwrap();
+let (width, height) = plugin.show_editor(window_id, WindowIDType::this_platform()).unwrap();
 window.set_size(width as u32, height as u32).unwrap();
 
 loop {
