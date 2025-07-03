@@ -11,6 +11,27 @@ enum class PlayingState : uint8_t {
   OfflineRendering,
 };
 
+template<typename T>
+union MaybeUninit {
+  T value;
+};
+
+/// Real-time safe, fixed-size, FFI friendly vector.
+template<typename T, uintptr_t N>
+struct HeaplessVec {
+  uintptr_t count;
+  MaybeUninit<T> data[N];
+};
+
+/// Real-time safe, fixed-size, FFI friendly String.
+/// Call `to_string` or `as_str` to get a normal string type.
+/// N refers to the number of bytes, of characters.
+/// Stored as UTF-8.
+template<uintptr_t N>
+struct HeaplessString {
+  HeaplessVec<uint8_t, N> data;
+};
+
 struct Dims {
   int width;
   int height;
@@ -26,18 +47,6 @@ struct FFIPluginDescriptor {
 
 struct AudioBusDescriptor {
   uintptr_t channels;
-};
-
-template<typename T>
-union MaybeUninit {
-  T value;
-};
-
-/// Real-time safe, fixed-size, FFI friendly vector.
-template<typename T, uintptr_t N>
-struct HeaplessVec {
-  uintptr_t count;
-  MaybeUninit<T> data[N];
 };
 
 /// Input and output configuration for the plugin.
@@ -123,15 +132,6 @@ struct HostIssuedEvent {
   bool is_live;
 };
 
-/// Real-time safe, fixed-size, FFI friendly String.
-/// Call `to_string` or `as_str` to get a normal string type.
-/// N refers to the number of bytes, of characters.
-/// Stored as UTF-8.
-template<uintptr_t N>
-struct HeaplessString {
-  HeaplessVec<uint8_t, N> data;
-};
-
 struct Parameter {
   int32_t id;
   HeaplessString<256> name;
@@ -185,6 +185,8 @@ struct PluginIssuedEvent {
 
 extern "C" {
 
+bool push_c_str_to_heapless_string(HeaplessString<256> *heapless_string, const char *c_str);
+
 extern const void *load_plugin(const char *path, const char *id, const void *vst3_instance);
 
 extern Dims show_gui(const void *app, const void *window_id);
@@ -223,7 +225,5 @@ extern void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 1
 extern void free_string(const char *str);
 
 void send_event_to_host(const PluginIssuedEvent *event, const void *vst3_instance);
-
-bool push_c_str_to_heapless_string(HeaplessString<256> *heapless_string, const char *c_str);
 
 }  // extern "C"

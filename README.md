@@ -15,6 +15,8 @@ let host = host::Host::new(
     env!("CARGO_PKG_AUTHORS"),
 );
 
+thread_check::mark_current_as_main();
+
 let descriptors = discovery::get_descriptor_from_file(&plugin_path);
 println!("{:?}", descriptors);
 

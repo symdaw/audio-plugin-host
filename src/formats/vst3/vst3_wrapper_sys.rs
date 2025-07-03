@@ -3,10 +3,10 @@ use std::{
     path::Path,
 };
 
-use ringbuf::{traits::Producer, HeapProd};
+use ringbuf::{traits::Producer};
 
 use crate::{
-    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{clap::load, vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, ProcessDetails
+    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, ProcessDetails
 };
 
 #[link(name = "vst3wrapper", kind = "static")]

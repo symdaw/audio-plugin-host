@@ -16,6 +16,8 @@ fn main() {
         env!("CARGO_PKG_AUTHORS"),
     );
 
+    thread_check::mark_current_as_main();
+
     let plugin_path = PathBuf::from(std::env::args().nth(1).expect("No plugin path provided"));
 
     let descriptors = discovery::get_descriptor_from_file(&plugin_path);

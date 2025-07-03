@@ -13,6 +13,7 @@ use clap_sys::ext::gui::*;
 use clap_sys::ext::latency::*;
 use clap_sys::ext::log::*;
 use clap_sys::ext::params::*;
+use clap_sys::ext::thread_check::{clap_host_thread_check, CLAP_EXT_THREAD_CHECK};
 use clap_sys::ext::thread_pool::{clap_host_thread_pool, CLAP_EXT_THREAD_POOL};
 use clap_sys::factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID};
 use clap_sys::host::*;
@@ -30,6 +31,7 @@ use crate::event::{HostIssuedEvent, PluginIssuedEvent};
 use crate::formats::Common;
 use crate::heapless_vec::{HeaplessString, HeaplessVec};
 use crate::plugin::PluginInner;
+use crate::thread_check::{is_main_thread, is_thread_checking_enabled};
 use crate::{BlockSize, SampleRate, WindowIDType};
 
 struct Clap {
@@ -294,6 +296,16 @@ pub unsafe extern "C" fn clap_callback_get_extension(
         };
 
         return &POOL as *const _ as *const c_void;
+    } else if CStr::from_ptr(ext) == CLAP_EXT_THREAD_CHECK {
+        if is_thread_checking_enabled() {
+            static THREAD_CHECK: clap_host_thread_check = clap_host_thread_check {
+                is_main_thread: Some(clap_callback_is_main_thread),
+                is_audio_thread: Some(clap_callback_is_audio_thread),
+            };
+
+            return &THREAD_CHECK as *const _ as *const c_void;
+        }
+
     }
 
     println!(
@@ -327,6 +339,16 @@ pub unsafe extern "C" fn clap_callback_send_io_changed(host: *const clap_host) {
     let _ = access_host_data(&mut *(host as *mut _))
         .plugin_issued_events_producer
         .try_push(PluginIssuedEvent::IOChanged);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn clap_callback_is_main_thread(_host: *const clap_host) -> bool {
+    is_main_thread()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn clap_callback_is_audio_thread(_host: *const clap_host) -> bool {
+    !is_main_thread()
 }
 
 #[no_mangle]
@@ -475,56 +497,8 @@ impl PluginInner for Clap {
 
             self.in_events.clear();
 
-            const NOTE_ON: u8 = 0x90;
-            const NOTE_OFF: u8 = 0x80;
-
             for event in events {
-                let mut new_event: ClapEvent = zeroed();
-                new_event.header.time = event.block_time as u32;
-
-                if event.is_live {
-                    new_event.header.flags |= CLAP_EVENT_IS_LIVE;
-                }
-
-                match event.event_type {
-                    crate::event::HostIssuedEventType::Midi(midi_event) => {
-                        match midi_event.midi_data[0] {
-                            NOTE_ON => {
-                                new_event.note.header.type_ = CLAP_EVENT_NOTE_ON;
-                                new_event.note.header.size =
-                                    std::mem::size_of::<clap_event_note>() as u32;
-                                new_event.note.port_index = event.bus_index as i16;
-                                new_event.note.key = midi_event.midi_data[1] as i16;
-                                new_event.note.velocity = midi_event.midi_data[2] as f64;
-                            }
-                            NOTE_OFF => {
-                                new_event.note.header.type_ = CLAP_EVENT_NOTE_OFF;
-                                new_event.note.header.size =
-                                    std::mem::size_of::<clap_event_note>() as u32;
-                                new_event.note.port_index = event.bus_index as i16;
-                                new_event.note.key = midi_event.midi_data[1] as i16;
-                                new_event.note.velocity = midi_event.midi_data[2] as f64;
-                            }
-                            _ => {
-                                new_event.midi.header.type_ = CLAP_EVENT_MIDI;
-                                new_event.midi.header.size =
-                                    std::mem::size_of::<clap_event_midi>() as u32;
-                                new_event.midi.port_index = event.bus_index as u16;
-                                new_event.midi.data = midi_event.midi_data;
-                            }
-                        };
-                    }
-                    crate::event::HostIssuedEventType::Parameter(parameter_update) => {
-                        new_event.param_value.header.type_ = CLAP_EVENT_PARAM_VALUE;
-                        new_event.param_value.header.size =
-                            std::mem::size_of::<clap_event_param_value>() as u32;
-                        new_event.param_value.param_id = parameter_update.parameter_id as u32;
-                        new_event.param_value.value = parameter_update.current_value as f64;
-
-                        // There's a bunch of other stuff in `clap_event_param_value` that needs to
-                        // be looked at.
-                    }
-                }
+                let new_event = create_clap_event(event);
 
                 let _ = self.in_events.push(new_event);
             }
@@ -655,6 +629,8 @@ impl PluginInner for Clap {
         window_id_type: WindowIDType,
     ) -> Result<(usize, usize), Error> {
         unsafe {
+            crate::thread_check::ensure_main_thread("Clap::show_editor");
+
             let plugin = &*self.plugin;
             let gui = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_GUI.as_ptr())
                 as *const clap_plugin_gui;
@@ -759,4 +735,57 @@ impl PluginInner for Clap {
         self.block_size = size;
         self.reactivate();
     }
+}
+
+unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
+    let mut new_event: ClapEvent = zeroed();
+    new_event.header.time = event.block_time as u32;
+
+    if event.is_live {
+        new_event.header.flags |= CLAP_EVENT_IS_LIVE;
+    }
+
+    const NOTE_ON: u8 = 0x90;
+    const NOTE_OFF: u8 = 0x80;
+
+    match event.event_type {
+        crate::event::HostIssuedEventType::Midi(midi_event) => {
+            match midi_event.midi_data[0] {
+                NOTE_ON => {
+                    new_event.note.header.type_ = CLAP_EVENT_NOTE_ON;
+                    new_event.note.header.size =
+                        std::mem::size_of::<clap_event_note>() as u32;
+                    new_event.note.port_index = event.bus_index as i16;
+                    new_event.note.key = midi_event.midi_data[1] as i16;
+                    new_event.note.velocity = midi_event.midi_data[2] as f64;
+                }
+                NOTE_OFF => {
+                    new_event.note.header.type_ = CLAP_EVENT_NOTE_OFF;
+                    new_event.note.header.size =
+                        std::mem::size_of::<clap_event_note>() as u32;
+                    new_event.note.port_index = event.bus_index as i16;
+                    new_event.note.key = midi_event.midi_data[1] as i16;
+                    new_event.note.velocity = midi_event.midi_data[2] as f64;
+                }
+                _ => {
+                    new_event.midi.header.type_ = CLAP_EVENT_MIDI;
+                    new_event.midi.header.size =
+                        std::mem::size_of::<clap_event_midi>() as u32;
+                    new_event.midi.port_index = event.bus_index as u16;
+                    new_event.midi.data = midi_event.midi_data;
+                }
+            };
+        }
+        crate::event::HostIssuedEventType::Parameter(parameter_update) => {
+            new_event.param_value.header.type_ = CLAP_EVENT_PARAM_VALUE;
+            new_event.param_value.header.size =
+                std::mem::size_of::<clap_event_param_value>() as u32;
+            new_event.param_value.param_id = parameter_update.parameter_id as u32;
+            new_event.param_value.value = parameter_update.current_value as f64;
+
+            // There's a bunch of other stuff in `clap_event_param_value` that needs to
+            // be looked at.
+        }
+    }
+    new_event
 }

@@ -7,11 +7,12 @@ pub mod event;
 pub mod host;
 pub mod parameter;
 pub mod plugin;
+pub mod heapless_vec;
+pub mod thread_check;
 
 pub use plugin::load;
 
 mod formats;
-pub mod heapless_vec;
 
 ///////////////////// Unsorted
 
