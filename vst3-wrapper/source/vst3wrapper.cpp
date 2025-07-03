@@ -392,6 +392,8 @@ bool PluginInstance::load_plugin_from_class(
 void PluginInstance::destroy() { _destroy(true); }
 
 uint32_t get_latency(const void* app) {
+  ffi_ensure_non_main_thread("[VST3] get_latency");
+
   // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Workflow+Diagrams/Get+Latency+Call+Sequence.html
   PluginInstance *vst = (PluginInstance *)app;
   vst->_audioEffect->setProcessing(false);
@@ -666,6 +668,7 @@ void set_data(const void *app, const void *data, int32_t data_len) {
 
 void process(const void *app, const ProcessDetails *data, float ***input,
              float ***output, HostIssuedEvent *events, int32_t events_len) {
+  ffi_ensure_non_main_thread("[VST3] process");
   PluginInstance *vst = (PluginInstance *)app;
 
   auto audio_inputs = vst->_io_config.audio_inputs.count;
@@ -826,6 +829,8 @@ void free_string(const char *str) { delete[] str; }
 Parameter get_parameter(const void *app, int32_t id) {
   // TODO: sort out naming confusion with id and index
 
+  ffi_ensure_main_thread("[VST3] get_parameter");
+
   PluginInstance *vst = (PluginInstance *)app;
 
   ParameterInfo param_info = {};
@@ -884,6 +889,8 @@ IOConfigutaion io_config(const void *app) {
 }
 
 uintptr_t parameter_count(const void *app) {
+  ffi_ensure_main_thread("[VST3] get_latency");
+
   auto vst = (PluginInstance *)app;
   return vst->_editController->getParameterCount();
 };

@@ -187,6 +187,10 @@ extern "C" {
 
 bool push_c_str_to_heapless_string(HeaplessString<256> *heapless_string, const char *c_str);
 
+void ffi_ensure_main_thread(const char *fn_name);
+
+void ffi_ensure_non_main_thread(const char *fn_name);
+
 extern const void *load_plugin(const char *path, const char *id, const void *vst3_instance);
 
 extern Dims show_gui(const void *app, const void *window_id);

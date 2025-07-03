@@ -11,6 +11,7 @@ use crate::heapless_vec::{HeaplessString, HeaplessVec};
 use crate::host::{Host, KnobPreference, Language};
 use crate::parameter::Parameter;
 use crate::plugin::PluginInner;
+use crate::thread_check::{ensure_main_thread, ensure_non_main_thread};
 use crate::{error::Error, SampleRate};
 use crate::{BlockSize, PlayingState, ProcessDetails, WindowIDType};
 
@@ -171,6 +172,8 @@ impl PluginInner for Vst2 {
     }
 
     fn show_editor(&mut self, window_id: *mut std::ffi::c_void, _window_id_type: WindowIDType) -> Result<(usize, usize), Error> {
+        ensure_main_thread("[VST2] show_editor");
+
         if self.editor.is_none() {
             let Some(editor) = self.plugin_instance.get_editor() else {
                 return err("Plugin does not have an editor".to_string());
@@ -228,6 +231,8 @@ impl PluginInner for Vst2 {
         events: Vec<HostIssuedEvent>,
         process_details: &ProcessDetails,
     ) {
+        ensure_non_main_thread("[VST2] process");
+
         let _ = outputs;
         {
             let mut details_lock = self.process_details.lock().unwrap();

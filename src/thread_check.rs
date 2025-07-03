@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::atomic::AtomicBool};
+use std::{cell::RefCell, ffi::CStr, sync::atomic::AtomicBool};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum ThreadType {
@@ -17,23 +17,33 @@ pub fn mark_current_as_main() {
 }
 
 pub(crate) fn ensure_main_thread(fn_name: &'static str) {
-    if !MAIN_THREAD_IDENTIFIED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !is_thread_checking_enabled() {
         return;
     }
 
-    if is_main_thread() {
+    if !is_main_thread() {
         log_misbehaviour(fn_name, "Called outside of main thread.");
     }
 }
 
 pub(crate) fn ensure_non_main_thread(fn_name: &'static str) {
-    if !MAIN_THREAD_IDENTIFIED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !is_thread_checking_enabled() {
         return;
     }
 
-    if !is_main_thread() {
+    if is_main_thread() {
         log_misbehaviour(fn_name, "Called from main thread but should not have been.");
     }
+}
+
+#[no_mangle]
+pub(crate) extern "C" fn ffi_ensure_main_thread(fn_name: *const std::ffi::c_char) {
+    ensure_main_thread(unsafe { CStr::from_ptr(fn_name).to_str().unwrap() } );
+}
+
+#[no_mangle]
+pub(crate) extern "C" fn ffi_ensure_non_main_thread(fn_name: *const std::ffi::c_char) {
+    ensure_non_main_thread(unsafe { CStr::from_ptr(fn_name).to_str().unwrap() } );
 }
 
 pub(crate) fn is_thread_checking_enabled() -> bool {
