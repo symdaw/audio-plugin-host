@@ -16,7 +16,7 @@ fn main() {
         env!("CARGO_PKG_AUTHORS"),
     );
 
-    host.thread_pool_hander = Some(thread_pool_run);
+    host.thread_pool_handler = Some(thread_pool_run);
 
     thread_check::mark_current_as_main();
 

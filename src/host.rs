@@ -7,9 +7,9 @@ pub struct Host {
     pub knob_preference: Option<KnobPreference>,
     pub language: Option<Language>,
     #[cfg(feature = "future_thread_pool")]
-    pub thread_pool_hander: Option<fn(callback: Box<dyn std::future::Future<Output = ()>>)>,
+    pub thread_pool_handler: Option<fn(callback: Box<dyn std::future::Future<Output = ()>>)>,
     #[cfg(not(feature = "future_thread_pool"))]
-    pub thread_pool_hander: Option<fn(callback: Box<dyn Fn(usize)>, count: usize)>,
+    pub thread_pool_handler: Option<fn(callback: Box<dyn Fn(usize)>, count: usize)>,
 }
 
 impl Host {

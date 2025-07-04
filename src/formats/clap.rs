@@ -460,7 +460,7 @@ pub unsafe extern "C" fn clap_callback_thread_pool_request_exec(
     });
 
     #[cfg(feature = "future_thread_pool")]
-    if let Some(handler) = host_data.host.thread_pool_hander {
+    if let Some(handler) = host_data.host.thread_pool_handler {
         let tasks = (0..num_tasks)
             .into_iter()
             .map(|task_index| {
@@ -471,15 +471,13 @@ pub unsafe extern "C" fn clap_callback_thread_pool_request_exec(
             })
             .collect::<Vec<_>>();
 
-        let fut = Box::new(async move {
+        handler(Box::new(async move {
             futures::future::join_all(tasks).await;
-        });
-
-        handler(fut);
+        }));
     }
 
     #[cfg(not(feature = "future_thread_pool"))]
-    if let Some(handler) = host_data.host.thread_pool_hander {
+    if let Some(handler) = host_data.host.thread_pool_handler {
         handler(task, num_tasks as usize);
 
         return true;
