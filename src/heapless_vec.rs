@@ -3,6 +3,7 @@ use std::{fmt::Debug, mem, ops::Index};
 use crate::error::{err, Error};
 
 #[repr(C)]
+#[derive(Copy)]
 union MaybeUninit<T: Copy> {
     uninit: (),
     pub value: T,
@@ -15,7 +16,7 @@ impl<T: Copy> Default for MaybeUninit<T> {
 }
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 /// Real-time safe, fixed-size, FFI friendly vector.
 pub struct HeaplessVec<T: Copy, const N: usize> {
     count: usize,

@@ -85,14 +85,13 @@ impl PluginInner for Vst3 {
             });
         }
 
-        // TODO: Make real-time safe
-        let mut channel_buffers = vec![];
+        let mut channel_buffers = HeaplessVec::<HeaplessVec<*mut f32, 16>, 32>::new();
 
-        let mut input_ptrs: Vec<*mut *mut f32> = Vec::with_capacity(inputs.len());
-        let mut output_ptrs: Vec<*mut *mut f32> = Vec::with_capacity(outputs.len());
+        let mut input_ptrs = HeaplessVec::<*mut *mut f32, 16>::new();
+        let mut output_ptrs = HeaplessVec::<*mut *mut f32, 16>::new();
 
         for bus in inputs.iter() {
-            let mut channels = vec![];
+            let mut channels = HeaplessVec::<*mut f32, 16>::new();
             for channel_idx in 0..bus.data.len() {
                 channels.push(bus.data[channel_idx].as_ptr() as *mut f32);
             }
@@ -101,7 +100,7 @@ impl PluginInner for Vst3 {
         }
 
         for bus in outputs.iter_mut() {
-            let mut channels = vec![];
+            let mut channels = HeaplessVec::<*mut f32, 16>::new();
             for channel_idx in 0..bus.data.len() {
                 channels.push(bus.data[channel_idx].as_mut_ptr());
             }

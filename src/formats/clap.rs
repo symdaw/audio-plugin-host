@@ -291,11 +291,11 @@ pub unsafe extern "C" fn clap_callback_get_extension(
 
         return &PORTS_CONFIG as *const _ as *const c_void;
     } else if CStr::from_ptr(ext) == CLAP_EXT_THREAD_POOL {
-        static POOL: clap_host_thread_pool = clap_host_thread_pool {
-            request_exec: Some(clap_callback_thread_pool_request_exec),
-        };
+        // static POOL: clap_host_thread_pool = clap_host_thread_pool {
+        //     request_exec: Some(clap_callback_thread_pool_request_exec),
+        // };
 
-        return &POOL as *const _ as *const c_void;
+        // return &POOL as *const _ as *const c_void;
     } else if CStr::from_ptr(ext) == CLAP_EXT_THREAD_CHECK {
         if is_thread_checking_enabled() {
             static THREAD_CHECK: clap_host_thread_check = clap_host_thread_check {
@@ -465,7 +465,7 @@ impl PluginInner for Clap {
             let mut input_pointers = HeaplessVec::<*mut f32, 16>::new();
             for input in inputs {
                 for channel in input.data.iter() {
-                    input_pointers.push(channel.as_ptr() as *mut f32);
+                    let _ = input_pointers.push(channel.as_ptr() as *mut f32);
                 }
             }
 
@@ -480,7 +480,7 @@ impl PluginInner for Clap {
             let mut output_pointers = HeaplessVec::<*mut f32, 16>::new();
             for input in outputs {
                 for channel in input.data.iter() {
-                    output_pointers.push(channel.as_ptr() as *mut f32);
+                    let _ = output_pointers.push(channel.as_ptr() as *mut f32);
                 }
             }
 
