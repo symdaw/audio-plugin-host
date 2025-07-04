@@ -4,8 +4,8 @@ use std::ffi::{c_char, c_void, CStr};
 use std::mem::zeroed;
 use std::path::Path;
 
-use clap_sys::audio_buffer::clap_audio_buffer;
-use clap_sys::entry::clap_plugin_entry;
+use clap_sys::audio_buffer::*;
+use clap_sys::entry::*;
 use clap_sys::events::*;
 use clap_sys::ext::audio_ports::*;
 use clap_sys::ext::audio_ports_config::*;
@@ -13,9 +13,9 @@ use clap_sys::ext::gui::*;
 use clap_sys::ext::latency::*;
 use clap_sys::ext::log::*;
 use clap_sys::ext::params::*;
-use clap_sys::ext::thread_check::{clap_host_thread_check, CLAP_EXT_THREAD_CHECK};
-use clap_sys::ext::thread_pool::{clap_host_thread_pool, CLAP_EXT_THREAD_POOL};
-use clap_sys::factory::plugin_factory::{clap_plugin_factory, CLAP_PLUGIN_FACTORY_ID};
+use clap_sys::ext::thread_check::*;
+use clap_sys::ext::thread_pool::*;
+use clap_sys::factory::plugin_factory::*;
 use clap_sys::host::*;
 use clap_sys::plugin::*;
 use clap_sys::process::*;
@@ -30,6 +30,7 @@ use crate::error::Error;
 use crate::event::{HostIssuedEvent, PluginIssuedEvent};
 use crate::formats::Common;
 use crate::heapless_vec::{HeaplessString, HeaplessVec};
+use crate::host::Host;
 use crate::plugin::PluginInner;
 use crate::thread_check::{is_main_thread, is_thread_checking_enabled};
 use crate::{BlockSize, SampleRate, WindowIDType};
@@ -68,6 +69,8 @@ union ClapEvent {
 // Everything in this must be thread-safe or not mutated.
 struct HostData {
     plugin_issued_events_producer: HeapProd<PluginIssuedEvent>,
+    host: Host,
+    plugin: *const clap_plugin,
 }
 
 pub fn load(
@@ -174,6 +177,9 @@ impl Clap {
 
         let mut host_data = Box::new(HostData {
             plugin_issued_events_producer: common.plugin_issued_events_producer,
+            // Assigned below
+            plugin: std::ptr::null(),
+            host: common.host,
         });
 
         let clap_host_ = Box::new(clap_host {
@@ -201,6 +207,9 @@ impl Clap {
         }
 
         self.host = Some(clap_host_);
+
+        host_data.plugin = plugin;
+
         self.host_data = Some(host_data);
 
         self.plugin = plugin;
@@ -291,11 +300,11 @@ pub unsafe extern "C" fn clap_callback_get_extension(
 
         return &PORTS_CONFIG as *const _ as *const c_void;
     } else if CStr::from_ptr(ext) == CLAP_EXT_THREAD_POOL {
-        // static POOL: clap_host_thread_pool = clap_host_thread_pool {
-        //     request_exec: Some(clap_callback_thread_pool_request_exec),
-        // };
+        static POOL: clap_host_thread_pool = clap_host_thread_pool {
+            request_exec: Some(clap_callback_thread_pool_request_exec),
+        };
 
-        // return &POOL as *const _ as *const c_void;
+        return &POOL as *const _ as *const c_void;
     } else if CStr::from_ptr(ext) == CLAP_EXT_THREAD_CHECK {
         if is_thread_checking_enabled() {
             static THREAD_CHECK: clap_host_thread_check = clap_host_thread_check {
@@ -305,7 +314,6 @@ pub unsafe extern "C" fn clap_callback_get_extension(
 
             return &THREAD_CHECK as *const _ as *const c_void;
         }
-
     }
 
     println!(
@@ -436,6 +444,47 @@ pub unsafe extern "C" fn clap_callback_thread_pool_request_exec(
     host: *const clap_host,
     num_tasks: u32,
 ) -> bool {
+    let host_data = &*((*host).host_data as *const HostData);
+
+    assert!(
+        !host_data.plugin.is_null(),
+        "CLAP plugin is not initialized"
+    );
+    let plugin = host_data.plugin;
+
+    let task = Box::new(move |task_index: usize| {
+        let pool = (*plugin).get_extension.unwrap()(plugin, CLAP_EXT_THREAD_POOL.as_ptr())
+            as *const clap_plugin_thread_pool;
+        let pool = &*pool;
+        pool.exec.unwrap()(plugin, task_index as u32);
+    });
+
+    #[cfg(feature = "future_thread_pool")]
+    if let Some(handler) = host_data.host.thread_pool_hander {
+        let tasks = (0..num_tasks)
+            .into_iter()
+            .map(|task_index| {
+                let task = task.clone();
+                async move {
+                    task(task_index as usize);
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let fut = Box::new(async move {
+            futures::future::join_all(tasks).await;
+        });
+
+        handler(fut);
+    }
+
+    #[cfg(not(feature = "future_thread_pool"))]
+    if let Some(handler) = host_data.host.thread_pool_hander {
+        handler(task, num_tasks as usize);
+
+        return true;
+    }
+
     false
 }
 
@@ -753,24 +802,21 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
             match midi_event.midi_data[0] {
                 NOTE_ON => {
                     new_event.note.header.type_ = CLAP_EVENT_NOTE_ON;
-                    new_event.note.header.size =
-                        std::mem::size_of::<clap_event_note>() as u32;
+                    new_event.note.header.size = std::mem::size_of::<clap_event_note>() as u32;
                     new_event.note.port_index = event.bus_index as i16;
                     new_event.note.key = midi_event.midi_data[1] as i16;
                     new_event.note.velocity = midi_event.midi_data[2] as f64;
                 }
                 NOTE_OFF => {
                     new_event.note.header.type_ = CLAP_EVENT_NOTE_OFF;
-                    new_event.note.header.size =
-                        std::mem::size_of::<clap_event_note>() as u32;
+                    new_event.note.header.size = std::mem::size_of::<clap_event_note>() as u32;
                     new_event.note.port_index = event.bus_index as i16;
                     new_event.note.key = midi_event.midi_data[1] as i16;
                     new_event.note.velocity = midi_event.midi_data[2] as f64;
                 }
                 _ => {
                     new_event.midi.header.type_ = CLAP_EVENT_MIDI;
-                    new_event.midi.header.size =
-                        std::mem::size_of::<clap_event_midi>() as u32;
+                    new_event.midi.header.size = std::mem::size_of::<clap_event_midi>() as u32;
                     new_event.midi.port_index = event.bus_index as u16;
                     new_event.midi.data = midi_event.midi_data;
                 }

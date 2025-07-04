@@ -2,6 +2,7 @@ use crate::{error::{err, Error}, heapless_vec::HeaplessVec};
 
 pub struct AudioBus<'a, T> {
     pub data: &'a mut Vec<Vec<T>>,
+    /// For `new_alloced`. If non-null this is freed on drop.
     owned_data: *mut Vec<Vec<T>>,
 }
 

@@ -10,11 +10,13 @@ use sdl2::audio::{AudioCallback, AudioDevice};
 use sdl2::{Sdl, VideoSubsystem};
 
 fn main() {
-    let host = host::Host::new(
+    let mut host = host::Host::new(
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_AUTHORS"),
     );
+
+    host.thread_pool_hander = Some(thread_pool_run);
 
     thread_check::mark_current_as_main();
 
@@ -72,6 +74,13 @@ fn main() {
                 _ => {}
             }
         }
+    }
+}
+
+fn thread_pool_run(func: Box<dyn Fn(usize)>, num_tasks: usize) {
+    for i in 0..num_tasks {
+        println!("[ThreadPool] Running task {}", i);
+        func(i);
     }
 }
 

@@ -81,7 +81,11 @@ loop {
 }
 ```
 
-# Licensing
+## Feature Flags
+- `future-thread-pool`: Abstracts the CLAP thread pool behind an awaitable `Future`.
+- `serde`: Adds `Serialize` and `Deserialize` to various structures.
+
+## Licensing
 You may use this in any project, proprietary or open source but if you 
 vendor it or make modifications, those changes must be made public.
 

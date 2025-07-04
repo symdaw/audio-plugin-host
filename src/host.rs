@@ -6,6 +6,10 @@ pub struct Host {
     pub url: &'static str,
     pub knob_preference: Option<KnobPreference>,
     pub language: Option<Language>,
+    #[cfg(feature = "future_thread_pool")]
+    pub thread_pool_hander: Option<fn(callback: Box<dyn std::future::Future<Output = ()>>)>,
+    #[cfg(not(feature = "future_thread_pool"))]
+    pub thread_pool_hander: Option<fn(callback: Box<dyn Fn(usize)>, count: usize)>,
 }
 
 impl Host {
