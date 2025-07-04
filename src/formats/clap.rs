@@ -803,14 +803,14 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
                     new_event.note.header.size = std::mem::size_of::<clap_event_note>() as u32;
                     new_event.note.port_index = event.bus_index as i16;
                     new_event.note.key = midi_event.midi_data[1] as i16;
-                    new_event.note.velocity = midi_event.midi_data[2] as f64;
+                    new_event.note.velocity = midi_event.midi_data[2] as f64 / 127.;
                 }
                 NOTE_OFF => {
                     new_event.note.header.type_ = CLAP_EVENT_NOTE_OFF;
                     new_event.note.header.size = std::mem::size_of::<clap_event_note>() as u32;
                     new_event.note.port_index = event.bus_index as i16;
                     new_event.note.key = midi_event.midi_data[1] as i16;
-                    new_event.note.velocity = midi_event.midi_data[2] as f64;
+                    new_event.note.velocity = midi_event.midi_data[2] as f64 / 127.;
                 }
                 _ => {
                     new_event.midi.header.type_ = CLAP_EVENT_MIDI;

@@ -192,7 +192,6 @@ void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plu
   PluginContextFactory::instance().setPluginContext(plugin_ctx);
 
   std::string error;
-  std::cout << path << std::endl;
   auto module_ = VST3::Hosting::Module::create(path, error);
   if (!module_) {
     std::cerr << "Failed to load VST3 module: " << error << std::endl;
@@ -394,13 +393,14 @@ void PluginInstance::destroy() { _destroy(true); }
 uint32_t get_latency(const void* app) {
   ffi_ensure_main_thread("[VST3] get_latency");
 
-  // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Workflow+Diagrams/Get+Latency+Call+Sequence.html
   PluginInstance *vst = (PluginInstance *)app;
+
+  // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Workflow+Diagrams/Get+Latency+Call+Sequence.html
 
   // [(UI-thread or processing-thread) & Activated] 
   vst->_audioEffect->setProcessing(false);
 
-
+  // [UI-thread & Setup Done]
   vst->_vstPlug->setActive(false);
   vst->_vstPlug->setActive(true);
 
@@ -634,7 +634,27 @@ FFIPluginDescriptor descriptor(const void *app) {
 }
 
 void vst3_set_sample_rate(const void *app, int32_t rate) {
+  ffi_ensure_main_thread("[VST3] vst3_set_sample_rate");
+
   PluginInstance *vst = (PluginInstance *)app;
+
+  // [(UI-thread or processing-thread) & Activated] 
+  vst->_audioEffect->setProcessing(false);
+
+  // [UI-thread & Setup Done]
+  vst->_vstPlug->setActive(false);
+
+  vst->_processSetup.sampleRate = rate;
+
+  // [UI-thread & (Initialized | Connected)]] 
+  vst->_audioEffect->setupProcessing(vst->_processSetup);
+
+  // [UI-thread & Setup Done]
+  vst->_vstPlug->setActive(true);
+
+  // [(UI-thread or processing-thread) & Activated] 
+  vst->_audioEffect->setProcessing(true);
+
   vst->_processData.processContext->sampleRate = rate;
 }
 
@@ -696,13 +716,6 @@ void process(const void *app, const ProcessDetails *data, float ***input,
     vst->_processData.outputs[i].channelBuffers32 = output[i];
   }
 
-  // if (vst->numBuses(kAudio, kOutput) > 0) {
-  //   vst->_processData.outputs->channelBuffers32 = output;
-  // }
-  // if (vst->numBuses(kAudio, kInput) > 0) {
-  //   vst->_processData.inputs->channelBuffers32 = input;
-  // }
-
   Steinberg::uint32 state = 0;
 
   Steinberg::Vst::ProcessContext *ctx = vst->_processData.processContext;
@@ -754,6 +767,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   }
 
   vst->_processData.processContext->state = state;
+  vst->_processData.processContext->state = state;
 
   int midi_bus = 0;
   Steinberg::Vst::EventList *eventList = nullptr;
@@ -777,18 +791,19 @@ void process(const void *app, const ProcessDetails *data, float ***input,
         evt.noteOn.channel = 0;
         evt.noteOn.pitch = events[i].event_type.midi._0.midi_data[1];
         evt.noteOn.tuning = events[i].event_type.midi._0.detune;
-        evt.noteOn.velocity = events[i].event_type.midi._0.midi_data[2];
+        evt.noteOn.velocity = (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
         evt.noteOn.length = 0;
         evt.noteOn.noteId = -1;
+        eventList->addEvent(evt);
       } else if (is_note_off) {
         evt.type = Steinberg::Vst::Event::EventTypes::kNoteOffEvent;
         evt.noteOff.channel = 0;
         evt.noteOff.pitch = events[i].event_type.midi._0.midi_data[1];
         evt.noteOff.tuning = events[i].event_type.midi._0.detune;
-        evt.noteOff.velocity = events[i].event_type.midi._0.midi_data[2];
+        evt.noteOff.velocity = (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
         evt.noteOff.noteId = -1;
-      }
-      eventList->addEvent(evt);
+        eventList->addEvent(evt);
+      } 
     }
   }
 

@@ -39,6 +39,8 @@ extern "C" {
     pub(super) fn get_latency(app: *const c_void) -> u32;
     pub(super) fn get_descriptors(path: *const c_char, plugins: *mut HeaplessVec<FFIPluginDescriptor, 10>);
 
+    pub(super) fn vst3_set_sample_rate(app: *const c_void, sample_rate: i32);
+
     fn free_string(str: *const c_char);
 }
 

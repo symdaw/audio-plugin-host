@@ -226,6 +226,8 @@ extern uint32_t get_latency(const void *app);
 
 extern void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plugins);
 
+extern void vst3_set_sample_rate(const void *app, int32_t sample_rate);
+
 extern void free_string(const char *str);
 
 void send_event_to_host(const PluginIssuedEvent *event, const void *vst3_instance);

@@ -211,6 +211,10 @@ impl PluginInner for Vst3 {
     fn get_parameter_count(&self) -> usize {
         unsafe { vst3_wrapper_sys::parameter_count(self.app) }
     }
+
+    fn change_sample_rate(&mut self, _rate: crate::SampleRate) {
+        unsafe { vst3_wrapper_sys::vst3_set_sample_rate(self.app, _rate as i32) };
+    }
 }
 
 /// Gets param updates taking the final update at the latest sample for each parameter
