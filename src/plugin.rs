@@ -86,8 +86,25 @@ impl PluginInstance {
 
         self.resume();
 
-        self.last_seen_block_size.store(process_details.block_size, Ordering::Relaxed);
-        self.last_seen_sample_rate.store(process_details.sample_rate, Ordering::Relaxed);
+        // FIXME: The abstraction has leaked....
+        //        VST2 wants this stuff in the audio thread other formats do not.
+        //        Maybe just make the libary consumer give these in both threads.
+        if self.descriptor.format == crate::discovery::Format::Vst2 {
+            if self.sample_rate != process_details.sample_rate {
+                self.sample_rate = process_details.sample_rate;
+                self.inner.change_sample_rate(process_details.sample_rate);
+            }
+            if self.sample_rate != process_details.sample_rate {
+                self.sample_rate = process_details.sample_rate;
+                self.inner.change_block_size(process_details.sample_rate);
+            }
+        } else {
+            // NOTE: The the sample rate and block size is given in the process data is because 
+            //       I originally didn't realise that in both VST3 and CLAP you set those in the
+            //       UI thread. So now there's this hacky atomic thing and maybe it should be resdesigned.
+            self.last_seen_block_size.store(process_details.block_size, Ordering::Relaxed);
+            self.last_seen_sample_rate.store(process_details.sample_rate, Ordering::Relaxed);
+        }
 
         self.inner.process(inputs, outputs, events, process_details);
     }
@@ -98,7 +115,10 @@ impl PluginInstance {
     pub fn get_events(&mut self) -> Vec<PluginIssuedEvent> {
         self.inner.editor_updates();
 
-        self.fix_configuration();
+        // FIXME: see above
+        if self.descriptor.format != crate::discovery::Format::Vst2 {
+            self.fix_configuration();
+        }
 
         let mut events = Vec::new();
         while let Some(event) = self.plugin_issued_events.try_pop() {
