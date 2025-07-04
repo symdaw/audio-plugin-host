@@ -3,6 +3,7 @@
 use std::ffi::{c_char, c_void, CStr};
 use std::mem::zeroed;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use clap_sys::audio_buffer::*;
 use clap_sys::entry::*;
@@ -32,7 +33,9 @@ use crate::formats::Common;
 use crate::heapless_vec::{HeaplessString, HeaplessVec};
 use crate::host::Host;
 use crate::plugin::PluginInner;
-use crate::thread_check::{is_main_thread, is_thread_checking_enabled};
+use crate::thread_check::{
+    ensure_main_thread, ensure_non_main_thread, is_main_thread, is_thread_checking_enabled,
+};
 use crate::{BlockSize, SampleRate, WindowIDType};
 
 struct Clap {
@@ -47,6 +50,8 @@ struct Clap {
     sample_rate: SampleRate,
     in_events: EventBuffer,
     out_events: EventBuffer,
+    active: AtomicBool,
+    processing: AtomicBool,
 }
 
 type EventBuffer = HeaplessVec<ClapEvent, 64>;
@@ -134,26 +139,9 @@ impl Clap {
             sample_rate: 44100,
             in_events: HeaplessVec::new(),
             out_events: HeaplessVec::new(),
+            active: AtomicBool::new(false),
+            processing: AtomicBool::new(false),
         })
-    }
-
-    fn reactivate(&mut self) {
-        unsafe {
-            let plugin = &*self.plugin;
-
-            plugin.deactivate.unwrap()(self.plugin);
-
-            if !plugin.activate.unwrap()(
-                self.plugin,
-                self.sample_rate as f64,
-                self.block_size as u32,
-                self.block_size as u32,
-            ) {
-                eprintln!("Failed to reactivate CLAP plugin");
-            }
-
-            self.resume();
-        }
     }
 
     unsafe fn load_plugin(
@@ -214,7 +202,7 @@ impl Clap {
 
         self.plugin = plugin;
 
-        self.reactivate();
+        self.activate();
 
         Ok(())
     }
@@ -249,6 +237,71 @@ impl Clap {
         }
 
         Ok(descriptors)
+    }
+
+    unsafe fn activate(&mut self) {
+        ensure_main_thread("[CLAP] Clap::activate");
+        if self.active.load(Ordering::Relaxed) {
+            eprintln!("Clap::activate while plugin already activated");
+            return;
+        }
+
+        let plugin = &*self.plugin;
+
+        if !plugin.activate.unwrap()(
+            self.plugin,
+            self.sample_rate as f64,
+            self.block_size as u32,
+            self.block_size as u32,
+        ) {
+            eprintln!("Failed to reactivate CLAP plugin");
+            return;
+        }
+
+        self.active
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    unsafe fn deactivate(&mut self) {
+        ensure_main_thread("[CLAP] Clap::deactivate");
+        if !self.active.load(Ordering::Relaxed) {
+            eprintln!("Clap::deactivate while plugin not activated");
+            return;
+        }
+
+        let plugin = &*self.plugin;
+
+        plugin.deactivate.unwrap()(self.plugin);
+
+        self.active
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    unsafe fn start_processing(&mut self) {
+        ensure_non_main_thread("[CLAP] Clap::set_processing");
+        if !self.active.load(Ordering::Relaxed) || self.active.load(Ordering::Relaxed) {
+            eprintln!("Clap::start_processing while plugin not activated or already processing");
+        }
+
+        let plugin = &*self.plugin;
+
+        plugin.start_processing.unwrap()(self.plugin);
+
+        self.processing
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    unsafe fn stop_processing(&mut self) {
+        ensure_non_main_thread("[CLAP] Clap::set_processing");
+        if !self.active.load(Ordering::Relaxed) || !self.active.load(Ordering::Relaxed) {
+            eprintln!("Clap::stop_processing while plugin not activated or not processing");
+        }
+
+        let plugin = &*self.plugin;
+
+        plugin.stop_processing.unwrap()(self.plugin);
+
+        self.processing.store(false, Ordering::Relaxed);
     }
 }
 
@@ -505,6 +558,10 @@ impl PluginInner for Clap {
         process_details: &crate::ProcessDetails,
     ) {
         unsafe {
+            if !self.processing.load(Ordering::Relaxed) {
+                self.start_processing();
+            }
+
             let plugin = *self.plugin;
 
             self.process.frames_count = process_details.block_size as u32;
@@ -720,19 +777,9 @@ impl PluginInner for Clap {
 
     fn hide_editor(&mut self) {}
 
-    fn suspend(&mut self) {
-        unsafe {
-            let plugin = &*self.plugin;
-            plugin.stop_processing.unwrap()(self.plugin);
-        }
-    }
+    fn suspend(&mut self) {}
 
-    fn resume(&mut self) {
-        unsafe {
-            let plugin = &*self.plugin;
-            plugin.start_processing.unwrap()(self.plugin);
-        }
-    }
+    fn resume(&mut self) {}
 
     fn get_io_configuration(&mut self) -> crate::audio_bus::IOConfigutaion {
         crate::audio_bus::IOConfigutaion {
@@ -774,13 +821,19 @@ impl PluginInner for Clap {
     }
 
     fn change_sample_rate(&mut self, rate: crate::SampleRate) {
-        self.sample_rate = rate;
-        self.reactivate();
+        unsafe {
+            self.sample_rate = rate;
+            self.deactivate();
+            self.activate();
+        }
     }
 
     fn change_block_size(&mut self, size: crate::BlockSize) {
-        self.block_size = size;
-        self.reactivate();
+        unsafe {
+            self.block_size = size;
+            self.deactivate();
+            self.activate();
+        }
     }
 }
 

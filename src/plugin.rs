@@ -1,4 +1,4 @@
-use std::{any::Any, path::Path, sync::atomic::AtomicUsize};
+use std::{any::Any, path::Path, sync::atomic::{AtomicUsize, Ordering}};
 
 use ringbuf::{traits::*, HeapCons, HeapRb};
 
@@ -37,6 +37,8 @@ pub fn load<P: AsRef<Path>>(path: P, id: &str, host: &Host) -> Result<PluginInst
         plugin_issued_events: plugin_issued_events_consumer,
         sample_rate: 0,
         block_size: 0,
+        last_seen_block_size: AtomicUsize::new(0),
+        last_seen_sample_rate: AtomicUsize::new(0),
         showing_editor: false,
         io_configuration,
         resumed: false,
@@ -53,6 +55,8 @@ pub struct PluginInstance {
     plugin_issued_events: HeapCons<PluginIssuedEvent>,
     sample_rate: SampleRate,
     block_size: BlockSize,
+    last_seen_sample_rate: AtomicUsize,
+    last_seen_block_size: AtomicUsize,
     showing_editor: bool,
     latency: AtomicUsize,
     io_configuration: IOConfigutaion,
@@ -82,7 +86,8 @@ impl PluginInstance {
 
         self.resume();
 
-        self.fix_configuration(process_details);
+        self.last_seen_block_size.store(process_details.block_size, Ordering::Relaxed);
+        self.last_seen_sample_rate.store(process_details.sample_rate, Ordering::Relaxed);
 
         self.inner.process(inputs, outputs, events, process_details);
     }
@@ -92,6 +97,8 @@ impl PluginInstance {
     /// changes, etc.
     pub fn get_events(&mut self) -> Vec<PluginIssuedEvent> {
         self.inner.editor_updates();
+
+        self.fix_configuration();
 
         let mut events = Vec::new();
         while let Some(event) = self.plugin_issued_events.try_pop() {
@@ -199,15 +206,18 @@ impl PluginInstance {
         self.showing_editor
     }
 
-    fn fix_configuration(&mut self, process_details: &ProcessDetails) {
-        if self.sample_rate != process_details.sample_rate {
-            self.sample_rate = process_details.sample_rate;
-            self.inner.change_sample_rate(process_details.sample_rate);
+    fn fix_configuration(&mut self) {
+        let last_sample_rate = self.last_seen_sample_rate.load(Ordering::Relaxed);
+        let last_block_size = self.last_seen_block_size.load(Ordering::Relaxed);
+
+        if self.sample_rate != last_sample_rate {
+            self.sample_rate = last_sample_rate;
+            self.inner.change_sample_rate(last_sample_rate);
         }
 
-        if self.block_size != process_details.block_size {
-            self.block_size = process_details.block_size;
-            self.inner.change_block_size(process_details.block_size);
+        if self.block_size != last_block_size {
+            self.block_size = last_block_size;
+            self.inner.change_block_size(last_block_size);
         }
     }
 

@@ -90,22 +90,27 @@ impl PluginInner for Vst3 {
         let mut input_ptrs = HeaplessVec::<*mut *mut f32, 16>::new();
         let mut output_ptrs = HeaplessVec::<*mut *mut f32, 16>::new();
 
+
+        assert!(inputs.len() <= 16);        
         for bus in inputs.iter() {
             let mut channels = HeaplessVec::<*mut f32, 16>::new();
+            assert!(bus.data.len() <= 16);      
             for channel_idx in 0..bus.data.len() {
-                channels.push(bus.data[channel_idx].as_ptr() as *mut f32);
+                channels.push(bus.data[channel_idx].as_ptr() as *mut f32).unwrap();
             }
-            channel_buffers.push(channels);
-            input_ptrs.push(channel_buffers.last_mut().unwrap().as_mut_ptr());
+            channel_buffers.push(channels).unwrap();
+            input_ptrs.push(channel_buffers.last_mut().unwrap().as_mut_ptr()).unwrap();
         }
 
+        assert!(outputs.len() <= 16);        
         for bus in outputs.iter_mut() {
             let mut channels = HeaplessVec::<*mut f32, 16>::new();
+            assert!(bus.data.len() <= 16);        
             for channel_idx in 0..bus.data.len() {
-                channels.push(bus.data[channel_idx].as_mut_ptr());
+                channels.push(bus.data[channel_idx].as_mut_ptr()).unwrap();
             }
-            channel_buffers.push(channels);
-            output_ptrs.push(channel_buffers.last_mut().unwrap().as_mut_ptr());
+            channel_buffers.push(channels).unwrap();
+            output_ptrs.push(channel_buffers.last_mut().unwrap().as_mut_ptr()).unwrap();
         }
 
         unsafe {
