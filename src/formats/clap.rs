@@ -9,23 +9,28 @@ use clap_sys::audio_buffer::*;
 use clap_sys::entry::*;
 use clap_sys::events::*;
 use clap_sys::ext::audio_ports::*;
+use clap_sys::ext::audio_ports_activation::{
+    clap_plugin_audio_ports_activation, CLAP_EXT_AUDIO_PORTS_ACTIVATION,
+};
 use clap_sys::ext::audio_ports_config::*;
 use clap_sys::ext::gui::*;
 use clap_sys::ext::latency::*;
 use clap_sys::ext::log::*;
 use clap_sys::ext::params::*;
+use clap_sys::ext::state::{clap_plugin_state, CLAP_EXT_STATE};
 use clap_sys::ext::thread_check::*;
 use clap_sys::ext::thread_pool::*;
 use clap_sys::factory::plugin_factory::*;
 use clap_sys::host::*;
 use clap_sys::plugin::*;
 use clap_sys::process::*;
+use clap_sys::stream::{clap_istream, clap_ostream};
 use clap_sys::version::{clap_version_is_compatible, CLAP_VERSION};
 
 use ringbuf::traits::Producer;
 use ringbuf::HeapProd;
 
-use crate::audio_bus::AudioBusDescriptor;
+use crate::audio_bus::{AudioBusDescriptor, IOConfigutaion};
 use crate::discovery::PluginDescriptor;
 use crate::error::Error;
 use crate::event::{HostIssuedEvent, PluginIssuedEvent};
@@ -52,6 +57,7 @@ struct Clap {
     out_events: EventBuffer,
     active: AtomicBool,
     processing: AtomicBool,
+    last_io_config: Option<IOConfigutaion>,
 }
 
 type EventBuffer = HeaplessVec<ClapEvent, 64>;
@@ -60,15 +66,15 @@ type EventBuffer = HeaplessVec<ClapEvent, 64>;
 union ClapEvent {
     header: clap_event_header,
     note: clap_event_note,
-    note_expression: clap_event_note_expression,
+    _note_expression: clap_event_note_expression,
     param_value: clap_event_param_value,
-    param_mod: clap_event_param_mod,
-    param_gesture: clap_event_param_gesture,
+    _param_mod: clap_event_param_mod,
+    _param_gesture: clap_event_param_gesture,
     // Note: This one is kinda long. Maybe add a special case for it
     // transport: clap_event_transport,
     midi: clap_event_midi,
-    midi_sysex: clap_event_midi_sysex,
-    midi2: clap_event_midi2,
+    _midi_sysex: clap_event_midi_sysex,
+    _midi2: clap_event_midi2,
 }
 
 // Everything in this must be thread-safe or not mutated.
@@ -141,6 +147,7 @@ impl Clap {
             out_events: HeaplessVec::new(),
             active: AtomicBool::new(false),
             processing: AtomicBool::new(false),
+            last_io_config: None,
         })
     }
 
@@ -204,6 +211,20 @@ impl Clap {
 
         self.activate();
 
+        self.last_io_config = Some(self.get_current_io_configuration());
+
+        // let io_config = self.get_io_configuration();
+
+        // let port_activation = (*self.plugin).get_extension.unwrap()(
+        //     self.plugin,
+        //     CLAP_EXT_AUDIO_PORTS_ACTIVATION.as_ptr(),
+        // ) as *const clap_plugin_audio_ports_activation;
+
+        // for bus in io_config.audio_inputs.iter() {
+        //     let is_input = true;
+        //     (*port_activation).set_active(self.plugin, is_input)
+        // }
+
         Ok(())
     }
 
@@ -243,7 +264,6 @@ impl Clap {
         ensure_main_thread("[CLAP] Clap::activate");
         if self.active.load(Ordering::Relaxed) {
             eprintln!("Clap::activate while plugin already activated");
-            return;
         }
 
         let plugin = &*self.plugin;
@@ -266,7 +286,6 @@ impl Clap {
         ensure_main_thread("[CLAP] Clap::deactivate");
         if !self.active.load(Ordering::Relaxed) {
             eprintln!("Clap::deactivate while plugin not activated");
-            return;
         }
 
         let plugin = &*self.plugin;
@@ -279,7 +298,7 @@ impl Clap {
 
     unsafe fn start_processing(&mut self) {
         ensure_non_main_thread("[CLAP] Clap::set_processing");
-        if !self.active.load(Ordering::Relaxed) || self.active.load(Ordering::Relaxed) {
+        if !self.active.load(Ordering::Relaxed) || self.processing.load(Ordering::Relaxed) {
             eprintln!("Clap::start_processing while plugin not activated or already processing");
         }
 
@@ -293,7 +312,7 @@ impl Clap {
 
     unsafe fn stop_processing(&mut self) {
         ensure_non_main_thread("[CLAP] Clap::set_processing");
-        if !self.active.load(Ordering::Relaxed) || !self.active.load(Ordering::Relaxed) {
+        if !self.active.load(Ordering::Relaxed) || !self.processing.load(Ordering::Relaxed) {
             eprintln!("Clap::stop_processing while plugin not activated or not processing");
         }
 
@@ -302,6 +321,61 @@ impl Clap {
         plugin.stop_processing.unwrap()(self.plugin);
 
         self.processing.store(false, Ordering::Relaxed);
+    }
+
+    fn get_current_io_configuration(&self) -> IOConfigutaion {
+        ensure_main_thread("[CLAP] Clap::get_io_configuration");
+
+        unsafe {
+            let ports =
+                (*self.plugin).get_extension.unwrap()(self.plugin, CLAP_EXT_AUDIO_PORTS.as_ptr())
+                    as *const clap_plugin_audio_ports;
+
+            let ports = &*ports;
+
+            let input_count = ports.count.unwrap()(self.plugin, true);
+            let output_count = ports.count.unwrap()(self.plugin, false);
+
+            let mut audio_inputs = HeaplessVec::new();
+            let mut audio_outputs = HeaplessVec::new();
+
+            assert!(input_count <= 16);
+            assert!(output_count <= 16);
+
+            for i in 0..input_count {
+                let is_input = true;
+
+                let mut info: clap_audio_port_info = zeroed();
+
+                ports.get.unwrap()(self.plugin, i, is_input, &mut info);
+
+                audio_inputs
+                    .push(AudioBusDescriptor {
+                        channels: info.channel_count as usize,
+                    })
+                    .unwrap();
+            }
+
+            for i in 0..output_count {
+                let is_input = false;
+
+                let mut info: clap_audio_port_info = zeroed();
+
+                ports.get.unwrap()(self.plugin, i, is_input, &mut info);
+
+                audio_outputs
+                    .push(AudioBusDescriptor {
+                        channels: info.channel_count as usize,
+                    })
+                    .unwrap();
+            }
+
+            crate::audio_bus::IOConfigutaion {
+                audio_inputs,
+                audio_outputs,
+                event_inputs_count: 0,
+            }
+        }
     }
 }
 
@@ -344,7 +418,7 @@ pub unsafe extern "C" fn clap_callback_get_extension(
         return &LOG as *const _ as *const c_void;
     } else if CStr::from_ptr(ext) == CLAP_EXT_AUDIO_PORTS {
         // static PORTS: clap_host_audio_ports = clap_host_audio_ports { is_rescan_flag_supported: todo!(), rescan: todo!() };
-        //
+
         // return &PORTS as *const _ as *const c_void;
     } else if CStr::from_ptr(ext) == CLAP_EXT_AUDIO_PORTS_CONFIG {
         static PORTS_CONFIG: clap_host_audio_ports_config = clap_host_audio_ports_config {
@@ -440,6 +514,36 @@ pub unsafe extern "C" fn clap_callback_do_nothing(_host: *const clap_host) {}
 #[no_mangle]
 pub unsafe extern "C" fn clap_callback_do_gui_closed(host: *const clap_host, closed: bool) {
     // TODO
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn clap_istream_read(istream: *const clap_istream, buffer: *mut c_void, size: u64) -> i64 {
+    let our_data = &mut *((*istream).ctx as *mut Vec<u8>);
+    let their_data = std::slice::from_raw_parts_mut(buffer as *mut u8, size as usize);
+
+    let mut read = 0;
+
+    while read < their_data.len() {
+        // Data is reversed
+        if let Some(byte) = our_data.pop() {
+            their_data[read] = byte;
+            read += 1;
+        } else {
+            return 0;
+        }
+    }
+
+    read as i64
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn clap_ostream_write(ostream: *const clap_ostream, buffer: *const c_void, size: u64) -> i64 {
+    let our_data = &mut*((*ostream).ctx as *mut Vec<u8>);
+    let their_data = std::slice::from_raw_parts(buffer as *const u8, size as usize);
+
+    our_data.extend_from_slice(their_data);
+
+    0
 }
 
 #[no_mangle]
@@ -542,6 +646,11 @@ pub unsafe extern "C" fn clap_callback_thread_pool_request_exec(
 impl Drop for Clap {
     fn drop(&mut self) {
         unsafe {
+            if !self.plugin.is_null() {
+                self.stop_processing();
+                self.deactivate();
+            }
+
             if !self.entry.is_null() {
                 (*self.entry).deinit.unwrap()();
             }
@@ -565,6 +674,7 @@ impl PluginInner for Clap {
             let plugin = *self.plugin;
 
             self.process.frames_count = process_details.block_size as u32;
+            self.process.steady_time = -1;
 
             let mut input_pointers = HeaplessVec::<*mut f32, 16>::new();
             for input in inputs {
@@ -582,8 +692,8 @@ impl PluginInner for Clap {
             };
 
             let mut output_pointers = HeaplessVec::<*mut f32, 16>::new();
-            for input in outputs {
-                for channel in input.data.iter() {
+            for output in outputs {
+                for channel in output.data.iter() {
                     let _ = output_pointers.push(channel.as_ptr() as *mut f32);
                 }
             }
@@ -656,12 +766,61 @@ impl PluginInner for Clap {
         }
     }
 
-    fn set_preset_data(&mut self, data: Vec<u8>) -> Result<(), String> {
-        todo!()
+    fn set_preset_data(&mut self, mut data: Vec<u8>) -> Result<(), String> {
+        ensure_main_thread("[CLAP] Clap::set_preset_data");
+        unsafe {
+            let plugin = &*self.plugin;
+            let state = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_STATE.as_ptr())
+                as *const clap_plugin_state;
+
+            if state.is_null() {
+                return Err("Plugin does not support state extension".to_string());
+            }
+            
+            let state = &*state;
+
+            // See comment in `clap_istream_read`
+            data.reverse();
+
+            let stream = clap_istream {
+                ctx: &mut data as *mut _ as *mut c_void,
+                read: Some(clap_istream_read)
+            };
+
+            if !state.load.unwrap()(self.plugin, &stream) {
+                return Err("Failed to save state".to_string());
+            }
+
+            Ok(())
+        } 
     }
 
     fn get_preset_data(&mut self) -> Result<Vec<u8>, String> {
-        todo!()
+        ensure_main_thread("[CLAP] Clap::set_preset_data");
+        unsafe {
+            let plugin = &*self.plugin;
+            let state = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_STATE.as_ptr())
+                as *const clap_plugin_state;
+
+            if state.is_null() {
+                return Err("Plugin does not support state extension".to_string());
+            }
+            
+            let state = &*state;
+
+            let mut data = vec![];
+
+            let stream = clap_ostream {
+                ctx: &mut data as *mut _ as *mut c_void,
+                write: Some(clap_ostream_write)
+            };
+
+            if !state.save.unwrap()(self.plugin, &stream) {
+                return Err("Failed to save state".to_string());
+            }
+
+            Ok(data)
+        } 
     }
 
     fn get_preset_name(&mut self, id: i32) -> Result<String, String> {
@@ -782,11 +941,7 @@ impl PluginInner for Clap {
     fn resume(&mut self) {}
 
     fn get_io_configuration(&mut self) -> crate::audio_bus::IOConfigutaion {
-        crate::audio_bus::IOConfigutaion {
-            audio_inputs: HeaplessVec::from(&vec![AudioBusDescriptor { channels: 2 }]).unwrap(),
-            audio_outputs: HeaplessVec::from(&vec![AudioBusDescriptor { channels: 2 }]).unwrap(),
-            event_inputs_count: 0,
-        }
+        self.last_io_config.clone().unwrap()
     }
 
     fn get_latency(&mut self) -> crate::Samples {

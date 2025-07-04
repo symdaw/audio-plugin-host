@@ -142,6 +142,9 @@ impl PluginInstance {
         io
     }
 
+    // Note: These two functions are quite specific to VST2 and
+    //       should probably be removed from here.
+
     pub fn resume(&mut self) {
         if self.resumed {
             return;
