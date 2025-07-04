@@ -392,20 +392,32 @@ bool PluginInstance::load_plugin_from_class(
 void PluginInstance::destroy() { _destroy(true); }
 
 uint32_t get_latency(const void* app) {
-  ffi_ensure_non_main_thread("[VST3] get_latency");
+  ffi_ensure_main_thread("[VST3] get_latency");
 
   // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Workflow+Diagrams/Get+Latency+Call+Sequence.html
   PluginInstance *vst = (PluginInstance *)app;
+
+  // [(UI-thread or processing-thread) & Activated] 
   vst->_audioEffect->setProcessing(false);
+
+
   vst->_vstPlug->setActive(false);
   vst->_vstPlug->setActive(true);
+
+  // [(UI-thread or processing-thread) & Activated] 
   uint32_t latency = vst->_audioEffect->getLatencySamples();
+
+  // [(UI-thread or processing-thread) & Activated] 
   vst->_audioEffect->setProcessing(true);
   return latency;
 }
 
 void set_processing(const void *app, bool processing) {
+  // TODO: Ensure activated
+
   PluginInstance *vst = (PluginInstance *)app;
+
+  // [(UI-thread or processing-thread) & Activated] 
   vst->_audioEffect->setProcessing(processing);
 }
 
@@ -806,6 +818,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
     }
   }
 
+  // [processing-thread & Processing]  
   tresult result = vst->_audioEffect->process(vst->_processData);
   if (result != kResultOk) {
     std::cout << "Failed to process" << std::endl;
@@ -889,8 +902,10 @@ IOConfigutaion io_config(const void *app) {
 }
 
 uintptr_t parameter_count(const void *app) {
-  ffi_ensure_main_thread("[VST3] get_latency");
+  ffi_ensure_main_thread("[VST3] parameter_count");
 
   auto vst = (PluginInstance *)app;
+
+  // [UI-thread & Connected]  
   return vst->_editController->getParameterCount();
 };
