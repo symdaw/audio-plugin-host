@@ -5,7 +5,7 @@ use crate::{error::Error, host::Host, load, plugin::PluginInstance, Samples};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct PluginDescriptor {
     pub name: String,
@@ -23,9 +23,10 @@ impl PluginDescriptor {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Format {
+    #[default]
     Vst2,
     Vst3,
     Clap,
