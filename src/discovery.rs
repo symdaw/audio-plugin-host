@@ -68,12 +68,12 @@ pub fn is_vst2(path: &Path, check_contents: bool) -> bool {
     match goblin::Object::parse(&data) {
         Ok(goblin::Object::Elf(elf)) => elf.syms.iter().any(|s| {
             elf.strtab
-                .get(s.st_name)
-                .map(|s| s.map(|s| s == "VSTPluginMain").unwrap_or(false))
+                .get_at(s.st_shndx)
+                .map(|s| s == "VSTPluginMain")
                 .unwrap_or(false)
         }),
         Ok(goblin::Object::PE(pe)) => pe.exports.iter().any(|e| e.name == Some("VSTPluginMain")),
-        _ => false,
+        _ => true, // Can't check so just return true
     }
 }
 
