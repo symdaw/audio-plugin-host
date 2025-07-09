@@ -84,8 +84,6 @@ impl PluginInstance {
 
         events.sort_by_key(|e| e.block_time);
 
-        self.resume();
-
         // FIXME: The abstraction has leaked....
         //        VST2 wants this stuff in the audio thread other formats do not.
         //        Maybe just make the libary consumer give these in both threads.
@@ -94,9 +92,9 @@ impl PluginInstance {
                 self.sample_rate = process_details.sample_rate;
                 self.inner.change_sample_rate(process_details.sample_rate);
             }
-            if self.sample_rate != process_details.sample_rate {
-                self.sample_rate = process_details.sample_rate;
-                self.inner.change_block_size(process_details.sample_rate);
+            if self.block_size != process_details.block_size {
+                self.block_size = process_details.block_size;
+                self.inner.change_block_size(process_details.block_size);
             }
         } else {
             // NOTE: The the sample rate and block size is given in the process data is because 
@@ -105,6 +103,8 @@ impl PluginInstance {
             self.last_seen_block_size.store(process_details.block_size, Ordering::Relaxed);
             self.last_seen_sample_rate.store(process_details.sample_rate, Ordering::Relaxed);
         }
+
+        self.resume();
 
         self.inner.process(inputs, outputs, events, process_details);
     }
