@@ -46,7 +46,7 @@ pub fn get_descriptor_from_file(path: impl AsRef<Path>) -> Vec<PluginDescriptor>
     } else if is_clap(path.as_ref()) {
         crate::formats::clap::get_descriptor(path.as_ref())
     } else {
-        unimplemented!()
+        vec![]
     }
 }
 
