@@ -1,3 +1,7 @@
+// TODO: make safe rust way to call different plugin methods from the correct threads. Probably
+// with separate structures for audio and UI threads with the allowed methods and some raw pointer
+// stuff behind.
+
 use std::{any::Any, path::Path, sync::atomic::{AtomicUsize, Ordering}};
 
 use ringbuf::{traits::*, HeapCons, HeapRb};

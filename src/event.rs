@@ -50,6 +50,9 @@ pub enum PluginIssuedEvent {
     IOChanged,
     RequestEditorOpen,
     RequestEditorClose,
+    /// Tail length in samples. This is how long the plugin will continue to produce audio after
+    /// the last input sample (i.e. reverb tail).
+    TailLengthChanged(usize),
 }
 
 #[derive(Debug, Clone, Copy)]

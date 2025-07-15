@@ -1,5 +1,6 @@
 #include "vst3wrapper.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <unordered_map>
@@ -402,6 +403,16 @@ uint32_t get_latency(const void* app) {
 
   // [UI-thread & Setup Done]
   vst->_vstPlug->setActive(false);
+
+  // Gets and sends tail length changed update. This should eventually be done somewhere else.
+  // [UI-thread & Setup Done] 
+  uint32_t tail = vst->_audioEffect->getTailSamples();
+  PluginIssuedEvent event = {};
+  event.tag = PluginIssuedEvent::Tag::TailLengthChanged;
+  event.tail_length_changed = {};
+  event.tail_length_changed._0 = tail;
+  send_event_to_host(&event, vst->rust_side_vst3_instance_object);
+
   vst->_vstPlug->setActive(true);
 
   // [(UI-thread or processing-thread) & Activated] 

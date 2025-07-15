@@ -1,4 +1,6 @@
 // This is only partially implemented
+// TODO: save extensions and check if get_extension returns null pointers
+// TODO: sort out index/id mismatch
 
 use std::ffi::{c_char, c_void, CStr};
 use std::mem::zeroed;
@@ -9,15 +11,14 @@ use clap_sys::audio_buffer::*;
 use clap_sys::entry::*;
 use clap_sys::events::*;
 use clap_sys::ext::audio_ports::*;
-use clap_sys::ext::audio_ports_activation::{
-    clap_plugin_audio_ports_activation, CLAP_EXT_AUDIO_PORTS_ACTIVATION,
-};
+// use clap_sys::ext::audio_ports_activation::*;
 use clap_sys::ext::audio_ports_config::*;
 use clap_sys::ext::gui::*;
 use clap_sys::ext::latency::*;
 use clap_sys::ext::log::*;
 use clap_sys::ext::params::*;
-use clap_sys::ext::state::{clap_plugin_state, CLAP_EXT_STATE};
+use clap_sys::ext::state::*;
+use clap_sys::ext::tail::*;
 use clap_sys::ext::thread_check::*;
 use clap_sys::ext::thread_pool::*;
 use clap_sys::factory::plugin_factory::*;
@@ -441,6 +442,12 @@ pub unsafe extern "C" fn clap_callback_get_extension(
 
             return &THREAD_CHECK as *const _ as *const c_void;
         }
+    } else if CStr::from_ptr(ext) == CLAP_EXT_TAIL {
+        static TAIL: clap_host_tail = clap_host_tail {
+            changed: Some(clap_callback_tail_changed),
+        };
+
+        return &TAIL as *const _ as *const c_void;
     }
 
     println!(
@@ -506,6 +513,21 @@ pub unsafe extern "C" fn clap_callback_send_request_editor_close(host: *const cl
     // Note: The host may not actually handle this. There may need to be some kind of "can do" for
     //       hosts.
     true
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn clap_callback_tail_changed(host: *const clap_host) {
+    let host_data = access_host_data(&mut *(host as *mut _));
+
+    // TODO: get this value's initial state and send an event for it.
+    let plugin = &*host_data.plugin;
+    let tail_ext = plugin.get_extension.unwrap()(plugin, CLAP_EXT_TAIL.as_ptr())
+        as *const clap_plugin_tail;
+    let tail = (*tail_ext).get.unwrap()(plugin);
+
+    let _ = host_data
+        .plugin_issued_events_producer
+        .try_push(PluginIssuedEvent::TailLengthChanged(tail as usize));
 }
 
 #[no_mangle]

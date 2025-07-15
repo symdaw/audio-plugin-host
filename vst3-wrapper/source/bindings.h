@@ -160,6 +160,9 @@ struct PluginIssuedEvent {
     IOChanged,
     RequestEditorOpen,
     RequestEditorClose,
+    /// Tail length in samples. This is how long the plugin will continue to produce audio after
+    /// the last input sample (i.e. reverb tail).
+    TailLengthChanged,
   };
 
   struct ChangeLatency_Body {
@@ -175,11 +178,16 @@ struct PluginIssuedEvent {
     ParameterUpdate _0;
   };
 
+  struct TailLengthChanged_Body {
+    uintptr_t _0;
+  };
+
   Tag tag;
   union {
     ChangeLatency_Body change_latency;
     ResizeWindow_Body resize_window;
     Parameter_Body parameter;
+    TailLengthChanged_Body tail_length_changed;
   };
 };
 
