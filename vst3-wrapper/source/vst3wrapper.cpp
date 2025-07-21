@@ -85,7 +85,8 @@ public:
 
   ComponentHandler(
       std::vector<ParameterEditState> *_param_edits,
-      std::mutex *_param_edits_mutex, const void *_rust_side_vst3_instance_object,
+      std::mutex *_param_edits_mutex,
+      const void *_rust_side_vst3_instance_object,
       const std::unordered_map<ParamID, int> *_parameter_indicies) {
     param_edits = _param_edits;
     param_edits_mutex = _param_edits_mutex;
@@ -114,8 +115,9 @@ public:
 
       param.current_value = valueNormalized;
 
-      send_param_change_event(rust_side_vst3_instance_object, id, valueNormalized,
-                              param.initial_value, parameter_indicies);
+      send_param_change_event(rust_side_vst3_instance_object, id,
+                              valueNormalized, param.initial_value,
+                              parameter_indicies);
 
       return Steinberg::kResultOk;
     }
@@ -188,7 +190,8 @@ PluginInstance::~PluginInstance() { destroy(); }
 
 const int MAX_BLOCK_SIZE = 4096 * 2;
 
-void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plugins) {
+void get_descriptors(const char *path,
+                     HeaplessVec<FFIPluginDescriptor, 10> *plugins) {
   auto plugin_ctx = owned(NEW HostApplication());
   PluginContextFactory::instance().setPluginContext(plugin_ctx);
 
@@ -202,7 +205,8 @@ void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plu
   VST3::Hosting::PluginFactory factory = module_->getFactory();
   for (auto &classInfo : factory.classInfos()) {
     if (classInfo.category() == kVstAudioEffectClass) {
-      if (plugins->count >= 10) break;
+      if (plugins->count >= 10)
+        break;
 
       std::string name = classInfo.name();
       std::string vendor = classInfo.vendor();
@@ -210,7 +214,8 @@ void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plu
       std::string id = classInfo.ID().toString();
 
       plugins->data[plugins->count].value.name = alloc_string(name.c_str());
-      plugins->data[plugins->count].value.version = alloc_string(version.c_str());
+      plugins->data[plugins->count].value.version =
+          alloc_string(version.c_str());
       plugins->data[plugins->count].value.vendor = alloc_string(vendor.c_str());
       plugins->data[plugins->count].value.id = alloc_string(id.c_str());
 
@@ -245,12 +250,12 @@ bool PluginInstance::init(const std::string &path, const std::string &id) {
   VST3::Hosting::PluginFactory factory = _module->getFactory();
   for (auto &classInfo : factory.classInfos()) {
     if (classInfo.category() == kVstAudioEffectClass) {
-      if (id != classInfo.ID().toString()) continue;
+      if (id != classInfo.ID().toString())
+        continue;
 
       return this->load_plugin_from_class(factory, classInfo);
     }
   }
-
 
   std::cerr << "No plugin with the provided ID." << error << std::endl;
   return false;
@@ -391,21 +396,21 @@ bool PluginInstance::load_plugin_from_class(
 
 void PluginInstance::destroy() { _destroy(true); }
 
-uint32_t get_latency(const void* app) {
+uint32_t get_latency(const void *app) {
   ffi_ensure_main_thread("[VST3] get_latency");
 
   PluginInstance *vst = (PluginInstance *)app;
 
   // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/Workflow+Diagrams/Get+Latency+Call+Sequence.html
 
-  // [(UI-thread or processing-thread) & Activated] 
+  // [(UI-thread or processing-thread) & Activated]
   vst->_audioEffect->setProcessing(false);
 
   // [UI-thread & Setup Done]
   vst->_vstPlug->setActive(false);
 
-  // Gets and sends tail length changed update. This should eventually be done somewhere else.
-  // [UI-thread & Setup Done] 
+  // Gets and sends tail length changed update. This should eventually be done
+  // somewhere else. [UI-thread & Setup Done]
   uint32_t tail = vst->_audioEffect->getTailSamples();
   PluginIssuedEvent event = {};
   event.tag = PluginIssuedEvent::Tag::TailLengthChanged;
@@ -415,10 +420,10 @@ uint32_t get_latency(const void* app) {
 
   vst->_vstPlug->setActive(true);
 
-  // [(UI-thread or processing-thread) & Activated] 
+  // [(UI-thread or processing-thread) & Activated]
   uint32_t latency = vst->_audioEffect->getLatencySamples();
 
-  // [(UI-thread or processing-thread) & Activated] 
+  // [(UI-thread or processing-thread) & Activated]
   vst->_audioEffect->setProcessing(true);
   return latency;
 }
@@ -428,7 +433,7 @@ void set_processing(const void *app, bool processing) {
 
   PluginInstance *vst = (PluginInstance *)app;
 
-  // [(UI-thread or processing-thread) & Activated] 
+  // [(UI-thread or processing-thread) & Activated]
   vst->_audioEffect->setProcessing(processing);
 }
 
@@ -550,8 +555,7 @@ void PluginInstance::_destroy(bool decrementRefCount) {
   }
 }
 
-const void *load_plugin(const char *s,
-                        const char *id,
+const void *load_plugin(const char *s, const char *id,
                         const void *rust_side_vst3_instance_object) {
   PluginInstance *vst = new PluginInstance();
   vst->rust_side_vst3_instance_object = rust_side_vst3_instance_object;
@@ -594,7 +598,8 @@ Dims show_gui(const void *app, const void *window_id) {
       return {};
     }
 
-    vst->_view->setFrame(owned(new PlugFrame(vst->rust_side_vst3_instance_object)));
+    vst->_view->setFrame(
+        owned(new PlugFrame(vst->rust_side_vst3_instance_object)));
   }
 
 #ifdef _WIN32
@@ -621,8 +626,8 @@ Dims show_gui(const void *app, const void *window_id) {
   }
 
   return {
-    viewRect.getWidth(),
-    viewRect.getHeight(),
+      viewRect.getWidth(),
+      viewRect.getHeight(),
   };
 }
 
@@ -649,7 +654,7 @@ void vst3_set_sample_rate(const void *app, int32_t rate) {
 
   PluginInstance *vst = (PluginInstance *)app;
 
-  // [(UI-thread or processing-thread) & Activated] 
+  // [(UI-thread or processing-thread) & Activated]
   vst->_audioEffect->setProcessing(false);
 
   // [UI-thread & Setup Done]
@@ -657,13 +662,13 @@ void vst3_set_sample_rate(const void *app, int32_t rate) {
 
   vst->_processSetup.sampleRate = rate;
 
-  // [UI-thread & (Initialized | Connected)]] 
+  // [UI-thread & (Initialized | Connected)]]
   vst->_audioEffect->setupProcessing(vst->_processSetup);
 
   // [UI-thread & Setup Done]
   vst->_vstPlug->setActive(true);
 
-  // [(UI-thread or processing-thread) & Activated] 
+  // [(UI-thread or processing-thread) & Activated]
   vst->_audioEffect->setProcessing(true);
 
   vst->_processData.processContext->sampleRate = rate;
@@ -784,8 +789,11 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   Steinberg::Vst::EventList *eventList = nullptr;
   if (vst->_io_config.event_inputs_count > 0) {
     eventList = vst->eventList(Steinberg::Vst::kInput, midi_bus);
+
     for (int i = 0; i < events_len; i++) {
-      if (events[i].event_type.tag != HostIssuedEventType::Tag::Midi)
+      auto tag = events[i].event_type.tag;
+      if (tag != HostIssuedEventType::Tag::Midi &&
+          tag != HostIssuedEventType::Tag::NoteExpression)
         continue;
 
       Steinberg::Vst::Event evt = {};
@@ -797,34 +805,65 @@ void process(const void *app, const ProcessDetails *data, float ***input,
         evt.flags |= Steinberg::Vst::Event::EventFlags::kIsLive;
       }
 
-      bool is_note_on = events[i].event_type.midi._0.midi_data[0] == 0x90;
-      bool is_note_off = events[i].event_type.midi._0.midi_data[0] == 0x80;
+      if (tag == HostIssuedEventType::Tag::NoteExpression) {
+        evt.noteExpressionValue.value = (Steinberg::Vst::NoteExpressionValue)events[i].event_type.note_expression.value;
+        evt.noteExpressionValue.noteId = (int32_t)events[i].event_type.note_expression.note_id;
 
-      if (is_note_on) {
-        evt.type = Steinberg::Vst::Event::EventTypes::kNoteOnEvent;
-        evt.noteOn.channel = 0;
-        evt.noteOn.pitch = events[i].event_type.midi._0.midi_data[1];
-        evt.noteOn.tuning = events[i].event_type.midi._0.detune;
-        evt.noteOn.velocity = (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
-        evt.noteOn.length = 0;
-        evt.noteOn.noteId = -1;
-        eventList->addEvent(evt);
-      } else if (is_note_off) {
-        evt.type = Steinberg::Vst::Event::EventTypes::kNoteOffEvent;
-        evt.noteOff.channel = 0;
-        evt.noteOff.pitch = events[i].event_type.midi._0.midi_data[1];
-        evt.noteOff.tuning = events[i].event_type.midi._0.detune;
-        evt.noteOff.velocity = (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
-        evt.noteOff.noteId = -1;
-        eventList->addEvent(evt);
-      } else {
-        evt.type = Steinberg::Vst::Event::EventTypes::kDataEvent;
-        evt.data.size = 3;
-        evt.data.type = Steinberg::Vst::DataEvent::DataTypes::kMidiSysEx;
-        evt.data.bytes = events[i].event_type.midi._0.midi_data;
-        std::cout << events[i].event_type.midi._0.midi_data[1] <<  events[i].event_type.midi._0.midi_data[2] << std::endl;
-        eventList->addEvent(evt);
-      } 
+        switch (events[i].event_type.note_expression.expression_type) {
+          case NoteExpressionType::Volume: 
+            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kVolumeTypeID;
+            break;
+          case NoteExpressionType::Pan: 
+            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kPanTypeID;
+            break;
+          case NoteExpressionType::Tuning: 
+            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kTuningTypeID;
+            break;
+          case NoteExpressionType::Vibrato: 
+            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kVibratoTypeID;
+            break;
+          case NoteExpressionType::Brightness: 
+            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kBrightnessTypeID;
+            break;
+          case NoteExpressionType::Expression: 
+            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kExpressionTypeID;
+            break;
+        }
+      }
+
+      if (tag == HostIssuedEventType::Tag::Midi) {
+        bool is_note_on = events[i].event_type.midi._0.midi_data[0] == 0x90;
+        bool is_note_off = events[i].event_type.midi._0.midi_data[0] == 0x80;
+
+        if (is_note_on) {
+          evt.type = Steinberg::Vst::Event::EventTypes::kNoteOnEvent;
+          evt.noteOn.channel = 0;
+          evt.noteOn.pitch = events[i].event_type.midi._0.midi_data[1];
+          evt.noteOn.tuning = events[i].event_type.midi._0.detune;
+          evt.noteOn.velocity =
+              (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
+          evt.noteOn.length = 0;
+          evt.noteOn.noteId = -1;
+          eventList->addEvent(evt);
+        } else if (is_note_off) {
+          evt.type = Steinberg::Vst::Event::EventTypes::kNoteOffEvent;
+          evt.noteOff.channel = 0;
+          evt.noteOff.pitch = events[i].event_type.midi._0.midi_data[1];
+          evt.noteOff.tuning = events[i].event_type.midi._0.detune;
+          evt.noteOff.velocity =
+              (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
+          evt.noteOff.noteId = -1;
+          eventList->addEvent(evt);
+        } else {
+          evt.type = Steinberg::Vst::Event::EventTypes::kDataEvent;
+          evt.data.size = 3;
+          evt.data.type = Steinberg::Vst::DataEvent::DataTypes::kMidiSysEx;
+          evt.data.bytes = events[i].event_type.midi._0.midi_data;
+          std::cout << events[i].event_type.midi._0.midi_data[1]
+                    << events[i].event_type.midi._0.midi_data[2] << std::endl;
+          eventList->addEvent(evt);
+        }
+      }
     }
   }
 
@@ -854,7 +893,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
     }
   }
 
-  // [processing-thread & Processing]  
+  // [processing-thread & Processing]
   tresult result = vst->_audioEffect->process(vst->_processData);
   if (result != kResultOk) {
     std::cout << "Failed to process" << std::endl;
@@ -919,7 +958,8 @@ Parameter get_parameter(const void *app, int32_t id) {
 
   push_c_str_to_heapless_string(&param.name, name.c_str());
 
-  push_c_str_to_heapless_string(&param.formatted_value, formatted_value_c_str.c_str());
+  push_c_str_to_heapless_string(&param.formatted_value,
+                                formatted_value_c_str.c_str());
 
   param.is_wrap_around = (param_info.flags & ParameterInfo::kIsWrapAround) != 0;
   param.hidden = (param_info.flags & ParameterInfo::kIsHidden) != 0;
@@ -942,6 +982,6 @@ uintptr_t parameter_count(const void *app) {
 
   auto vst = (PluginInstance *)app;
 
-  // [UI-thread & Connected]  
+  // [UI-thread & Connected]
   return vst->_editController->getParameterCount();
 };

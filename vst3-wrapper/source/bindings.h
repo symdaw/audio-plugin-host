@@ -4,6 +4,15 @@
 #include <ostream>
 #include <new>
 
+enum class NoteExpressionType {
+  Volume,
+  Pan,
+  Tuning,
+  Vibrato,
+  Expression,
+  Brightness,
+};
+
 enum class PlayingState : uint8_t {
   Stopped,
   Playing,
@@ -85,6 +94,7 @@ struct MidiEvent {
   Samples note_length;
   uint8_t midi_data[3];
   float detune;
+  int32_t note_id;
 };
 
 struct ParameterUpdate {
@@ -103,6 +113,7 @@ struct HostIssuedEventType {
   enum class Tag {
     Midi,
     Parameter,
+    NoteExpression,
   };
 
   struct Midi_Body {
@@ -113,10 +124,17 @@ struct HostIssuedEventType {
     ParameterUpdate _0;
   };
 
+  struct NoteExpression_Body {
+    int32_t note_id;
+    NoteExpressionType expression_type;
+    double value;
+  };
+
   Tag tag;
   union {
     Midi_Body midi;
     Parameter_Body parameter;
+    NoteExpression_Body note_expression;
   };
 };
 

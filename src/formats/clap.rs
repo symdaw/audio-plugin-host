@@ -521,8 +521,8 @@ pub unsafe extern "C" fn clap_callback_tail_changed(host: *const clap_host) {
 
     // TODO: get this value's initial state and send an event for it.
     let plugin = &*host_data.plugin;
-    let tail_ext = plugin.get_extension.unwrap()(plugin, CLAP_EXT_TAIL.as_ptr())
-        as *const clap_plugin_tail;
+    let tail_ext =
+        plugin.get_extension.unwrap()(plugin, CLAP_EXT_TAIL.as_ptr()) as *const clap_plugin_tail;
     let tail = (*tail_ext).get.unwrap()(plugin);
 
     let _ = host_data
@@ -539,7 +539,11 @@ pub unsafe extern "C" fn clap_callback_do_gui_closed(host: *const clap_host, clo
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clap_istream_read(istream: *const clap_istream, buffer: *mut c_void, size: u64) -> i64 {
+pub unsafe extern "C" fn clap_istream_read(
+    istream: *const clap_istream,
+    buffer: *mut c_void,
+    size: u64,
+) -> i64 {
     let our_data = &mut *((*istream).ctx as *mut Vec<u8>);
     let their_data = std::slice::from_raw_parts_mut(buffer as *mut u8, size as usize);
 
@@ -559,8 +563,12 @@ pub unsafe extern "C" fn clap_istream_read(istream: *const clap_istream, buffer:
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clap_ostream_write(ostream: *const clap_ostream, buffer: *const c_void, size: u64) -> i64 {
-    let our_data = &mut*((*ostream).ctx as *mut Vec<u8>);
+pub unsafe extern "C" fn clap_ostream_write(
+    ostream: *const clap_ostream,
+    buffer: *const c_void,
+    size: u64,
+) -> i64 {
+    let our_data = &mut *((*ostream).ctx as *mut Vec<u8>);
     let their_data = std::slice::from_raw_parts(buffer as *const u8, size as usize);
 
     our_data.extend_from_slice(their_data);
@@ -798,7 +806,7 @@ impl PluginInner for Clap {
             if state.is_null() {
                 return Err("Plugin does not support state extension".to_string());
             }
-            
+
             let state = &*state;
 
             // See comment in `clap_istream_read`
@@ -806,7 +814,7 @@ impl PluginInner for Clap {
 
             let stream = clap_istream {
                 ctx: &mut data as *mut _ as *mut c_void,
-                read: Some(clap_istream_read)
+                read: Some(clap_istream_read),
             };
 
             if !state.load.unwrap()(self.plugin, &stream) {
@@ -814,7 +822,7 @@ impl PluginInner for Clap {
             }
 
             Ok(())
-        } 
+        }
     }
 
     fn get_preset_data(&mut self) -> Result<Vec<u8>, String> {
@@ -827,14 +835,14 @@ impl PluginInner for Clap {
             if state.is_null() {
                 return Err("Plugin does not support state extension".to_string());
             }
-            
+
             let state = &*state;
 
             let mut data = vec![];
 
             let stream = clap_ostream {
                 ctx: &mut data as *mut _ as *mut c_void,
-                write: Some(clap_ostream_write)
+                write: Some(clap_ostream_write),
             };
 
             if !state.save.unwrap()(self.plugin, &stream) {
@@ -842,7 +850,7 @@ impl PluginInner for Clap {
             }
 
             Ok(data)
-        } 
+        }
     }
 
     fn get_preset_name(&mut self, id: i32) -> Result<String, String> {
@@ -1034,6 +1042,7 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
                     new_event.note.port_index = event.bus_index as i16;
                     new_event.note.key = midi_event.midi_data[1] as i16;
                     new_event.note.velocity = midi_event.midi_data[2] as f64 / 127.;
+                    new_event.note.note_id = midi_event.note_id;
                 }
                 NOTE_OFF => {
                     new_event.note.header.type_ = CLAP_EVENT_NOTE_OFF;
@@ -1041,7 +1050,16 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
                     new_event.note.port_index = event.bus_index as i16;
                     new_event.note.key = midi_event.midi_data[1] as i16;
                     new_event.note.velocity = midi_event.midi_data[2] as f64 / 127.;
+                    new_event.note.note_id = midi_event.note_id;
                 }
+                // 0xE0 => {
+                //     new_event._note_expression.header.type_ = CLAP_EVENT_NOTE_EXPRESSION;
+                //     new_event._note_expression.header.size = std::mem::size_of::<clap_event_note>() as u32;
+                //     new_event._note_expression.port_index = event.bus_index as i16;
+                //     new_event._note_expression.key = -1;
+                //     new_event._note_expression.note_id = -1;
+                //     new_event._note_expression.value =
+                // }
                 _ => {
                     new_event.midi.header.type_ = CLAP_EVENT_MIDI;
                     new_event.midi.header.size = std::mem::size_of::<clap_event_midi>() as u32;
@@ -1059,6 +1077,26 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
 
             // There's a bunch of other stuff in `clap_event_param_value` that needs to
             // be looked at.
+        }
+        crate::event::HostIssuedEventType::NoteExpression {
+            note_id,
+            expression_type,
+            value,
+        } => {
+            new_event._note_expression.header.type_ = CLAP_EVENT_NOTE_EXPRESSION;
+            new_event._note_expression.header.size = std::mem::size_of::<clap_event_note>() as u32;
+            new_event._note_expression.port_index = event.bus_index as i16;
+            new_event._note_expression.key = -1;
+            new_event._note_expression.note_id = note_id;
+            new_event._note_expression.value = value as f64;
+            new_event._note_expression.expression_id = match expression_type {
+                crate::event::NoteExpressionType::Volume => CLAP_NOTE_EXPRESSION_VOLUME,
+                crate::event::NoteExpressionType::Pan => CLAP_NOTE_EXPRESSION_PAN,
+                crate::event::NoteExpressionType::Tuning => CLAP_NOTE_EXPRESSION_TUNING,
+                crate::event::NoteExpressionType::Vibrato => CLAP_NOTE_EXPRESSION_VIBRATO,
+                crate::event::NoteExpressionType::Expression => CLAP_NOTE_EXPRESSION_EXPRESSION,
+                crate::event::NoteExpressionType::Brightness => CLAP_NOTE_EXPRESSION_BRIGHTNESS,
+            }
         }
     }
     new_event

@@ -19,6 +19,22 @@ pub struct HostIssuedEvent {
 pub enum HostIssuedEventType {
     Midi(MidiEvent),
     Parameter(ParameterUpdate),
+    NoteExpression {
+        note_id: i32,
+        expression_type: NoteExpressionType,
+        value: f64,
+    },
+}
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub enum NoteExpressionType {
+    Volume,
+    Pan,
+    Tuning,
+    Vibrato,
+    Expression,
+    Brightness,
 }
 
 impl Default for HostIssuedEventType {
@@ -27,12 +43,14 @@ impl Default for HostIssuedEventType {
     }
 }
 
+// TODO: Refactor into enum to remove unnecessary fields
 #[repr(C)]
 #[derive(Debug, Clone, Default)]
 pub struct MidiEvent {
     pub note_length: Samples,
     pub midi_data: [u8; 3],
     pub detune: f32,
+    pub note_id: i32,
 }
 
 /// Events sent to the host from the plugin. Queued in the plugin and the consumed from the `get_events` function.
