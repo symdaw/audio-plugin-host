@@ -792,7 +792,10 @@ void process(const void *app, const ProcessDetails *data, float ***input,
       evt.busIndex = midi_bus;
       evt.sampleOffset = events[i].block_time;
       evt.ppqPosition = events[i].ppq_time;
-      // evt.flags = Steinberg::Vst::Event::EventFlags::kIsLive;
+
+      if (events[i].is_live) {
+        evt.flags |= Steinberg::Vst::Event::EventFlags::kIsLive;
+      }
 
       bool is_note_on = events[i].event_type.midi._0.midi_data[0] == 0x90;
       bool is_note_off = events[i].event_type.midi._0.midi_data[0] == 0x80;
@@ -813,6 +816,13 @@ void process(const void *app, const ProcessDetails *data, float ***input,
         evt.noteOff.tuning = events[i].event_type.midi._0.detune;
         evt.noteOff.velocity = (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
         evt.noteOff.noteId = -1;
+        eventList->addEvent(evt);
+      } else {
+        evt.type = Steinberg::Vst::Event::EventTypes::kDataEvent;
+        evt.data.size = 3;
+        evt.data.type = Steinberg::Vst::DataEvent::DataTypes::kMidiSysEx;
+        evt.data.bytes = events[i].event_type.midi._0.midi_data;
+        std::cout << events[i].event_type.midi._0.midi_data[1] <<  events[i].event_type.midi._0.midi_data[2] << std::endl;
         eventList->addEvent(evt);
       } 
     }
