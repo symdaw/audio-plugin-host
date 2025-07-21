@@ -807,28 +807,37 @@ void process(const void *app, const ProcessDetails *data, float ***input,
 
       if (tag == HostIssuedEventType::Tag::NoteExpression) {
         evt.type = Steinberg::Vst::Event::EventTypes::kNoteExpressionValueEvent;
-        evt.noteExpressionValue.value = (Steinberg::Vst::NoteExpressionValue)events[i].event_type.note_expression.value;
-        evt.noteExpressionValue.noteId = (int32_t)events[i].event_type.note_expression.note_id;
+        evt.noteExpressionValue.value =
+            (Steinberg::Vst::NoteExpressionValue)events[i]
+                .event_type.note_expression.value;
+        evt.noteExpressionValue.noteId =
+            (int32_t)events[i].event_type.note_expression.note_id;
 
         switch (events[i].event_type.note_expression.expression_type) {
-          case NoteExpressionType::Volume: 
-            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kVolumeTypeID;
-            break;
-          case NoteExpressionType::Pan: 
-            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kPanTypeID;
-            break;
-          case NoteExpressionType::Tuning: 
-            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kTuningTypeID;
-            break;
-          case NoteExpressionType::Vibrato: 
-            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kVibratoTypeID;
-            break;
-          case NoteExpressionType::Brightness: 
-            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kBrightnessTypeID;
-            break;
-          case NoteExpressionType::Expression: 
-            evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kExpressionTypeID;
-            break;
+        case NoteExpressionType::Volume:
+          evt.noteExpressionValue.typeId =
+              Steinberg::Vst::NoteExpressionTypeIDs::kVolumeTypeID;
+          break;
+        case NoteExpressionType::Pan:
+          evt.noteExpressionValue.typeId =
+              Steinberg::Vst::NoteExpressionTypeIDs::kPanTypeID;
+          break;
+        case NoteExpressionType::Tuning:
+          evt.noteExpressionValue.typeId =
+              Steinberg::Vst::NoteExpressionTypeIDs::kTuningTypeID;
+          break;
+        case NoteExpressionType::Vibrato:
+          evt.noteExpressionValue.typeId =
+              Steinberg::Vst::NoteExpressionTypeIDs::kVibratoTypeID;
+          break;
+        case NoteExpressionType::Brightness:
+          evt.noteExpressionValue.typeId =
+              Steinberg::Vst::NoteExpressionTypeIDs::kBrightnessTypeID;
+          break;
+        case NoteExpressionType::Expression:
+          evt.noteExpressionValue.typeId =
+              Steinberg::Vst::NoteExpressionTypeIDs::kExpressionTypeID;
+          break;
         }
 
         eventList->addEvent(evt);

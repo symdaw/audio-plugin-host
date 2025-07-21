@@ -1084,7 +1084,7 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
             value,
         } => {
             new_event._note_expression.header.type_ = CLAP_EVENT_NOTE_EXPRESSION;
-            new_event._note_expression.header.size = std::mem::size_of::<clap_event_note>() as u32;
+            new_event._note_expression.header.size = std::mem::size_of::<clap_note_expression>() as u32;
             new_event._note_expression.port_index = event.bus_index as i16;
             new_event._note_expression.key = -1;
             new_event._note_expression.note_id = note_id;
