@@ -806,6 +806,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
       }
 
       if (tag == HostIssuedEventType::Tag::NoteExpression) {
+        evt.type = Steinberg::Vst::Event::EventTypes::kNoteExpressionValueEvent;
         evt.noteExpressionValue.value = (Steinberg::Vst::NoteExpressionValue)events[i].event_type.note_expression.value;
         evt.noteExpressionValue.noteId = (int32_t)events[i].event_type.note_expression.note_id;
 
@@ -829,6 +830,8 @@ void process(const void *app, const ProcessDetails *data, float ***input,
             evt.noteExpressionValue.typeId = Steinberg::Vst::NoteExpressionTypeIDs::kExpressionTypeID;
             break;
         }
+
+        eventList->addEvent(evt);
       }
 
       if (tag == HostIssuedEventType::Tag::Midi) {
@@ -843,7 +846,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
           evt.noteOn.velocity =
               (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
           evt.noteOn.length = 0;
-          evt.noteOn.noteId = -1;
+          evt.noteOn.noteId = events[i].event_type.midi._0.note_id;
           eventList->addEvent(evt);
         } else if (is_note_off) {
           evt.type = Steinberg::Vst::Event::EventTypes::kNoteOffEvent;
@@ -852,7 +855,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
           evt.noteOff.tuning = events[i].event_type.midi._0.detune;
           evt.noteOff.velocity =
               (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
-          evt.noteOff.noteId = -1;
+          evt.noteOff.noteId = events[i].event_type.midi._0.note_id;
           eventList->addEvent(evt);
         } else {
           evt.type = Steinberg::Vst::Event::EventTypes::kDataEvent;
