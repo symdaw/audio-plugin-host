@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <mutex>
 #include <unordered_map>
 
@@ -29,6 +30,17 @@ struct ParameterEditState {
   bool finished;
 };
 
+struct MidiCC {
+  int32_t bus_index;
+  int16_t channel;
+  int16_t control_number;
+
+  uint64_t as_key() {
+    return ((uint64_t)bus_index << 32) | ((uint64_t)bus_index << 16) | (uint64_t)channel;
+  }
+};
+
+
 class PluginInstance {
 public:
   PluginInstance();
@@ -53,6 +65,9 @@ public:
   Steinberg::Vst::HostProcessData _processData = {};
 
   std::unordered_map<Steinberg::Vst::ParamID, int> parameter_indicies = {};
+  std::unordered_map<uint64_t, Steinberg::Vst::ParamID> midi_cc_mappings = {};
+
+  void look_for_cc_mapping(MidiCC cc);
 
   void _destroy(bool decrementRefCount);
 

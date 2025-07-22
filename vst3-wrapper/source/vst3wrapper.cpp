@@ -391,7 +391,31 @@ bool PluginInstance::load_plugin_from_class(
 
   get_io_config();
 
+  look_for_cc_mapping({0, 0, 129});
+
   return true;
+}
+
+void PluginInstance::look_for_cc_mapping(MidiCC cc) {
+  if (midi_cc_mappings.find(cc.as_key()) != midi_cc_mappings.end())
+    return;
+
+  IMidiMapping *midi_map = nullptr;
+  _editController->queryInterface(IMidiMapping::iid, (void **)&midi_map);
+  if (midi_map == nullptr)
+    return;
+
+  ParamID id = -1;
+
+  // [UI-thread & Connected]
+  if (midi_map->getMidiControllerAssignment(cc.bus_index, cc.channel,
+                                            cc.control_number, id) != kResultOk)
+    return;
+
+  if (id == -1)
+    return;
+
+  midi_cc_mappings[cc.as_key()] = id;
 }
 
 void PluginInstance::destroy() { _destroy(true); }
@@ -787,6 +811,11 @@ void process(const void *app, const ProcessDetails *data, float ***input,
 
   int midi_bus = 0;
   Steinberg::Vst::EventList *eventList = nullptr;
+
+  if (!vst->_processData.inputParameterChanges) {
+    vst->_processData.inputParameterChanges = new ParameterChanges(400);
+  }
+
   if (vst->_io_config.event_inputs_count > 0) {
     eventList = vst->eventList(Steinberg::Vst::kInput, midi_bus);
 
@@ -846,6 +875,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
       if (tag == HostIssuedEventType::Tag::Midi) {
         bool is_note_on = events[i].event_type.midi._0.midi_data[0] == 0x90;
         bool is_note_off = events[i].event_type.midi._0.midi_data[0] == 0x80;
+        bool is_pitch_bend = events[i].event_type.midi._0.midi_data[0] == 0xE0;
 
         if (is_note_on) {
           evt.type = Steinberg::Vst::Event::EventTypes::kNoteOnEvent;
@@ -866,6 +896,31 @@ void process(const void *app, const ProcessDetails *data, float ***input,
               (float)(events[i].event_type.midi._0.midi_data[2]) / 127.;
           evt.noteOff.noteId = events[i].event_type.midi._0.note_id;
           eventList->addEvent(evt);
+        } else if (is_pitch_bend) {
+          MidiCC cc = {0, 0, 129};
+          if (vst->midi_cc_mappings.find(cc.as_key()) !=
+              vst->midi_cc_mappings.end()) {
+            ParamID id = vst->midi_cc_mappings[cc.as_key()];
+
+            auto changes = vst->_processData.inputParameterChanges;
+
+            int queue_index = 0;
+            auto queue = changes->addParameterData(id, queue_index);
+
+            auto q = static_cast<ParameterValueQueue *>(queue);
+            q->clear();
+
+            float value =
+                (float)((events[i].event_type.midi._0.midi_data[2] << 7) |
+                        (events[i].event_type.midi._0.midi_data[1])) /
+                (float)0x4000;
+
+            int point_index = 0;
+            if (queue->addPoint(events[i].block_time, value, point_index) !=
+                kResultOk) {
+              std::cout << "Failed to set pitch bend" << std::endl;
+            }
+          }
         } else {
           evt.type = Steinberg::Vst::Event::EventTypes::kDataEvent;
           evt.data.size = 3;
@@ -882,10 +937,6 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   for (int i = 0; i < events_len; i++) {
     if (events[i].event_type.tag != HostIssuedEventType::Tag::Parameter)
       continue;
-
-    if (!vst->_processData.inputParameterChanges) {
-      vst->_processData.inputParameterChanges = new ParameterChanges(400);
-    }
 
     auto changes = vst->_processData.inputParameterChanges;
 

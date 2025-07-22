@@ -2,7 +2,11 @@
 // with separate structures for audio and UI threads with the allowed methods and some raw pointer
 // stuff behind.
 
-use std::{any::Any, path::Path, sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    any::Any,
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use ringbuf::{traits::*, HeapCons, HeapRb};
 
@@ -101,11 +105,13 @@ impl PluginInstance {
                 self.inner.change_block_size(process_details.block_size);
             }
         } else {
-            // NOTE: The the sample rate and block size is given in the process data is because 
+            // NOTE: The sample rate and block size is given in the process data is because
             //       I originally didn't realise that in both VST3 and CLAP you set those in the
             //       UI thread. So now there's this hacky atomic thing and maybe it should be resdesigned.
-            self.last_seen_block_size.store(process_details.block_size, Ordering::Relaxed);
-            self.last_seen_sample_rate.store(process_details.sample_rate, Ordering::Relaxed);
+            self.last_seen_block_size
+                .store(process_details.block_size, Ordering::Relaxed);
+            self.last_seen_sample_rate
+                .store(process_details.sample_rate, Ordering::Relaxed);
         }
 
         self.resume();
@@ -126,7 +132,19 @@ impl PluginInstance {
 
         let mut events = Vec::new();
         while let Some(event) = self.plugin_issued_events.try_pop() {
-            events.extend(self.create_subsequent_events(&event));
+            match event {
+                PluginIssuedEvent::IOChanged => {
+                    self.io_configuration = self.inner.get_io_configuration();
+
+                    let latency = self.inner.get_latency();
+
+                    self.latency
+                        .store(latency, std::sync::atomic::Ordering::Relaxed);
+
+                    events.push(PluginIssuedEvent::ChangeLatency(latency));
+                }
+                _ => {}
+            }
 
             events.push(event);
         }
@@ -247,25 +265,6 @@ impl PluginInstance {
             self.inner.change_block_size(last_block_size);
         }
     }
-
-    /// Returns any new events
-    fn create_subsequent_events(&mut self, event: &PluginIssuedEvent) -> Vec<PluginIssuedEvent> {
-        match event {
-            PluginIssuedEvent::IOChanged => {
-                self.io_configuration = self.inner.get_io_configuration();
-
-                let latency = self.inner.get_latency();
-
-                self.latency
-                    .store(latency, std::sync::atomic::Ordering::Relaxed);
-
-                vec![PluginIssuedEvent::ChangeLatency(latency)]
-            }
-            _ => {
-                vec![]
-            }
-        }
-    }
 }
 
 pub(crate) trait PluginInner {
@@ -284,7 +283,11 @@ pub(crate) trait PluginInner {
 
     fn get_parameter(&self, index: i32) -> Parameter;
 
-    fn show_editor(&mut self, window_id: *mut std::ffi::c_void, window_id_type: WindowIDType) -> Result<(usize, usize), Error>;
+    fn show_editor(
+        &mut self,
+        window_id: *mut std::ffi::c_void,
+        window_id_type: WindowIDType,
+    ) -> Result<(usize, usize), Error>;
     fn hide_editor(&mut self);
 
     fn change_sample_rate(&mut self, _rate: SampleRate);
