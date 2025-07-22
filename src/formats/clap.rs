@@ -85,6 +85,15 @@ struct HostData {
     plugin: *const clap_plugin,
 }
 
+unsafe fn get_extension<T>(plugin: *const clap_plugin, extension: &CStr) -> Option<&T> {
+    let plugin = &*plugin;
+    let ext = (plugin.get_extension?)(plugin, extension.as_ptr());
+    if ext.is_null() {
+        return None;
+    }
+    Some(&*(ext as *const T))
+}
+
 pub fn load(
     path: &Path,
     id: &str,
@@ -328,47 +337,45 @@ impl Clap {
         ensure_main_thread("[CLAP] Clap::get_io_configuration");
 
         unsafe {
-            let ports =
-                (*self.plugin).get_extension.unwrap()(self.plugin, CLAP_EXT_AUDIO_PORTS.as_ptr())
-                    as *const clap_plugin_audio_ports;
-
-            let ports = &*ports;
-
-            let input_count = ports.count.unwrap()(self.plugin, true);
-            let output_count = ports.count.unwrap()(self.plugin, false);
-
             let mut audio_inputs = HeaplessVec::new();
             let mut audio_outputs = HeaplessVec::new();
 
-            assert!(input_count <= 16);
-            assert!(output_count <= 16);
+            if let Some(ports) =
+                get_extension::<clap_plugin_audio_ports>(self.plugin, CLAP_EXT_AUDIO_PORTS)
+            {
+                let input_count = ports.count.unwrap()(self.plugin, true);
+                let output_count = ports.count.unwrap()(self.plugin, false);
 
-            for i in 0..input_count {
-                let is_input = true;
+                assert!(input_count <= 16);
+                assert!(output_count <= 16);
 
-                let mut info: clap_audio_port_info = zeroed();
+                for i in 0..input_count {
+                    let is_input = true;
 
-                ports.get.unwrap()(self.plugin, i, is_input, &mut info);
+                    let mut info: clap_audio_port_info = zeroed();
 
-                audio_inputs
-                    .push(AudioBusDescriptor {
-                        channels: info.channel_count as usize,
-                    })
-                    .unwrap();
-            }
+                    ports.get.unwrap()(self.plugin, i, is_input, &mut info);
 
-            for i in 0..output_count {
-                let is_input = false;
+                    audio_inputs
+                        .push(AudioBusDescriptor {
+                            channels: info.channel_count as usize,
+                        })
+                        .unwrap();
+                }
 
-                let mut info: clap_audio_port_info = zeroed();
+                for i in 0..output_count {
+                    let is_input = false;
 
-                ports.get.unwrap()(self.plugin, i, is_input, &mut info);
+                    let mut info: clap_audio_port_info = zeroed();
 
-                audio_outputs
-                    .push(AudioBusDescriptor {
-                        channels: info.channel_count as usize,
-                    })
-                    .unwrap();
+                    ports.get.unwrap()(self.plugin, i, is_input, &mut info);
+
+                    audio_outputs
+                        .push(AudioBusDescriptor {
+                            channels: info.channel_count as usize,
+                        })
+                        .unwrap();
+                }
             }
 
             crate::audio_bus::IOConfigutaion {
@@ -520,14 +527,14 @@ pub unsafe extern "C" fn clap_callback_tail_changed(host: *const clap_host) {
     let host_data = access_host_data(&mut *(host as *mut _));
 
     // TODO: get this value's initial state and send an event for it.
-    let plugin = &*host_data.plugin;
-    let tail_ext =
-        plugin.get_extension.unwrap()(plugin, CLAP_EXT_TAIL.as_ptr()) as *const clap_plugin_tail;
-    let tail = (*tail_ext).get.unwrap()(plugin);
 
-    let _ = host_data
-        .plugin_issued_events_producer
-        .try_push(PluginIssuedEvent::TailLengthChanged(tail as usize));
+    if let Some(tail_ext) = get_extension::<clap_plugin_tail>(host_data.plugin, CLAP_EXT_TAIL) {
+        let tail = tail_ext.get.unwrap()(host_data.plugin);
+
+        let _ = host_data
+            .plugin_issued_events_producer
+            .try_push(PluginIssuedEvent::TailLengthChanged(tail as usize));
+    }
 }
 
 #[no_mangle]
@@ -640,10 +647,11 @@ pub unsafe extern "C" fn clap_callback_thread_pool_request_exec(
     let plugin = host_data.plugin;
 
     let task = Box::new(move |task_index: usize| {
-        let pool = (*plugin).get_extension.unwrap()(plugin, CLAP_EXT_THREAD_POOL.as_ptr())
-            as *const clap_plugin_thread_pool;
-        let pool = &*pool;
-        pool.exec.unwrap()(plugin, task_index as u32);
+        if let Some(pool) =
+            get_extension::<clap_plugin_thread_pool>(host_data.plugin, CLAP_EXT_THREAD_POOL)
+        {
+            pool.exec.unwrap()(plugin, task_index as u32);
+        }
     });
 
     #[cfg(feature = "future_thread_pool")]
@@ -799,15 +807,10 @@ impl PluginInner for Clap {
     fn set_preset_data(&mut self, mut data: Vec<u8>) -> Result<(), String> {
         ensure_main_thread("[CLAP] Clap::set_preset_data");
         unsafe {
-            let plugin = &*self.plugin;
-            let state = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_STATE.as_ptr())
-                as *const clap_plugin_state;
-
-            if state.is_null() {
+            let Some(state) = get_extension::<clap_plugin_state>(self.plugin, CLAP_EXT_STATE)
+            else {
                 return Err("Plugin does not support state extension".to_string());
-            }
-
-            let state = &*state;
+            };
 
             // See comment in `clap_istream_read`
             data.reverse();
@@ -828,15 +831,10 @@ impl PluginInner for Clap {
     fn get_preset_data(&mut self) -> Result<Vec<u8>, String> {
         ensure_main_thread("[CLAP] Clap::set_preset_data");
         unsafe {
-            let plugin = &*self.plugin;
-            let state = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_STATE.as_ptr())
-                as *const clap_plugin_state;
-
-            if state.is_null() {
+            let Some(state) = get_extension::<clap_plugin_state>(self.plugin, CLAP_EXT_STATE)
+            else {
                 return Err("Plugin does not support state extension".to_string());
-            }
-
-            let state = &*state;
+            };
 
             let mut data = vec![];
 
@@ -863,15 +861,10 @@ impl PluginInner for Clap {
 
     fn get_parameter(&self, index: i32) -> crate::parameter::Parameter {
         unsafe {
-            let plugin = &*self.plugin;
-            let params = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_PARAMS.as_ptr())
-                as *const clap_plugin_params;
-
-            if params.is_null() {
-                // TODO: Make this function return a result.
-            }
-
-            let params = &*params;
+            let Some(params) = get_extension::<clap_plugin_params>(self.plugin, CLAP_EXT_PARAMS)
+            else {
+                return zeroed();
+            };
 
             // let count = params.count.unwrap()(self.plugin);
 
@@ -924,17 +917,11 @@ impl PluginInner for Clap {
         unsafe {
             crate::thread_check::ensure_main_thread("Clap::show_editor");
 
-            let plugin = &*self.plugin;
-            let gui = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_GUI.as_ptr())
-                as *const clap_plugin_gui;
-
-            if gui.is_null() {
+            let Some(gui) = get_extension::<clap_plugin_gui>(self.plugin, CLAP_EXT_GUI) else {
                 return Err(Error {
                     message: "CLAP plugin does not support GUI extension".to_string(),
                 });
-            }
-
-            let gui = &*gui;
+            };
 
             let api = match window_id_type {
                 WindowIDType::HWND => CLAP_WINDOW_API_WIN32,
@@ -964,7 +951,15 @@ impl PluginInner for Clap {
         }
     }
 
-    fn hide_editor(&mut self) {}
+    fn hide_editor(&mut self) {
+        unsafe {
+            let Some(gui) = get_extension::<clap_plugin_gui>(self.plugin, CLAP_EXT_GUI) else {
+                return;
+            };
+
+            let _ = gui.hide.unwrap()(self.plugin);
+        }
+    }
 
     fn suspend(&mut self) {}
 
@@ -976,30 +971,20 @@ impl PluginInner for Clap {
 
     fn get_latency(&mut self) -> crate::Samples {
         unsafe {
-            let plugin = &*self.plugin;
-            let latency = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_LATENCY.as_ptr())
-                as *const clap_plugin_latency;
-
-            if latency.is_null() {
+            let Some(latency) = get_extension::<clap_plugin_latency>(self.plugin, CLAP_EXT_LATENCY)
+            else {
                 return 0;
-            }
-
-            let latency = &*latency;
+            };
             latency.get.unwrap()(self.plugin) as crate::Samples
         }
     }
 
     fn get_parameter_count(&self) -> usize {
         unsafe {
-            let plugin = &*self.plugin;
-            let params = plugin.get_extension.unwrap()(self.plugin, CLAP_EXT_PARAMS.as_ptr())
-                as *const clap_plugin_params;
-
-            if params.is_null() {
+            let Some(params) = get_extension::<clap_plugin_params>(self.plugin, CLAP_EXT_PARAMS)
+            else {
                 return 0;
-            }
-
-            let params = &*params;
+            };
 
             params.count.unwrap()(self.plugin) as usize
         }
@@ -1043,6 +1028,7 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
                     new_event.note.key = midi_event.midi_data[1] as i16;
                     new_event.note.velocity = midi_event.midi_data[2] as f64 / 127.;
                     new_event.note.note_id = midi_event.note_id;
+                    new_event.note.channel = 0;
                 }
                 NOTE_OFF => {
                     new_event.note.header.type_ = CLAP_EVENT_NOTE_OFF;
@@ -1051,6 +1037,7 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
                     new_event.note.key = midi_event.midi_data[1] as i16;
                     new_event.note.velocity = midi_event.midi_data[2] as f64 / 127.;
                     new_event.note.note_id = midi_event.note_id;
+                    new_event.note.channel = 0;
                 }
                 // 0xE0 => {
                 //     new_event._note_expression.header.type_ = CLAP_EVENT_NOTE_EXPRESSION;
@@ -1084,9 +1071,11 @@ unsafe fn create_clap_event(event: HostIssuedEvent) -> ClapEvent {
             value,
         } => {
             new_event._note_expression.header.type_ = CLAP_EVENT_NOTE_EXPRESSION;
-            new_event._note_expression.header.size = std::mem::size_of::<clap_note_expression>() as u32;
+            new_event._note_expression.header.size =
+                std::mem::size_of::<clap_note_expression>() as u32;
             new_event._note_expression.port_index = event.bus_index as i16;
             new_event._note_expression.key = -1;
+            new_event._note_expression.channel = -1;
             new_event._note_expression.note_id = note_id;
             new_event._note_expression.value = value as f64;
             new_event._note_expression.expression_id = match expression_type {
