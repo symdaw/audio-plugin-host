@@ -258,20 +258,32 @@ bool PluginInstance::init(const std::string &path, const std::string &id) {
     }
   }
 
-  std::cerr << "No plugin with the provided ID." << error << std::endl;
+  std::cerr << "No plugin with the provided ID." << std::endl;
   return false;
 }
 
 bool PluginInstance::load_plugin_from_class(
     VST3::Hosting::PluginFactory &factory,
     VST3::Hosting::ClassInfo &classInfo) {
-  _plugProvider = owned(NEW PlugProvider(factory, classInfo, true));
-  if (!_plugProvider) {
-    std::cout << "No PlugProvider found" << std::endl;
-    return false;
-  }
+  // _plugProvider = owned(NEW PlugProvider(factory, classInfo, true));
+  // if (!_plugProvider) {
+  //   std::cout << "No PlugProvider found" << std::endl;
+  //   return false;
+  // }
 
-  _vstPlug = _plugProvider->getComponent();
+  // _plugProvider->initialize();
+
+  // _vstPlug = _plugProvider->getComponent();
+  // if (factory.createInstance(classInfo.ID(), Vst::IComponent::iid, (void**)&_vstPlug) != kResultOk) {
+  //   std::cout << "No component" << std::endl;
+  // }
+
+  _vstPlug = factory.createInstance<Steinberg::Vst::IComponent>(classInfo.ID());
+  if (!_vstPlug) return false;
+
+  if (_vstPlug->initialize(_standardPluginContext) != kResultOk) {
+    std::cout << "Failed to initialize component" << std::endl;
+  }
 
   _audioEffect = FUnknownPtr<IAudioProcessor>(_vstPlug);
   if (!_audioEffect) {
@@ -279,9 +291,20 @@ bool PluginInstance::load_plugin_from_class(
     return false;
   }
 
-  _editController = _plugProvider->getController();
+  auto res = _vstPlug->queryInterface(Vst::IEditController::iid, (void **)&_editController);
+
+  if (res != Steinberg::kResultOk) {
+    // _editController = _plugProvider->getController();
+    // _editController = factory.createInstance<Steinberg::Vst::IEditController>(classInfo.ID());
+
+    TUID controllerCID;
+    if (_vstPlug->getControllerClassId(controllerCID) == kResultOk) {
+      factory.get()->createInstance(controllerCID, Vst::IEditController::iid, (void**)&_editController);
+    }
+  }
+
   if (_editController->initialize(_standardPluginContext) != kResultOk) {
-    std::cout << "Failed to initialize editor context" << std::endl;
+    std::cout << "Failed to initialize controller" << std::endl;
   }
 
   param_edits = {};
@@ -296,7 +319,7 @@ bool PluginInstance::load_plugin_from_class(
   Vst::IConnectionPoint *iConnectionPointComponent = nullptr;
   Vst::IConnectionPoint *iConnectionPointController = nullptr;
 
-  _audioEffect->queryInterface(Vst::IConnectionPoint::iid,
+  _vstPlug->queryInterface(Vst::IConnectionPoint::iid,
                                (void **)&iConnectionPointComponent);
   _editController->queryInterface(Vst::IConnectionPoint::iid,
                                   (void **)&iConnectionPointController);
@@ -367,7 +390,7 @@ bool PluginInstance::load_plugin_from_class(
     _vstPlug->activateBus(kEvent, kOutput, i, false);
   }
 
-  tresult res = _audioEffect->setBusArrangements(
+  res = _audioEffect->setBusArrangements(
       _inSpeakerArrs.data(), _numInAudioBuses, _outSpeakerArrs.data(),
       _numOutAudioBuses);
   if (res != kResultTrue) {
@@ -571,17 +594,17 @@ void PluginInstance::_destroy(bool decrementRefCount) {
 
   name = "";
 
-  if (decrementRefCount) {
-    if (_standardPluginContextRefCount > 0) {
-      --_standardPluginContextRefCount;
-    }
-    if (_standardPluginContext && _standardPluginContextRefCount == 0) {
-      PluginContextFactory::instance().setPluginContext(nullptr);
-      _standardPluginContext->release();
-      delete _standardPluginContext;
-      _standardPluginContext = nullptr;
-    }
-  }
+  // if (decrementRefCount) {
+  //   if (_standardPluginContextRefCount > 0) {
+  //     --_standardPluginContextRefCount;
+  //   }
+  //   if (_standardPluginContext && _standardPluginContextRefCount == 0) {
+  //     PluginContextFactory::instance().setPluginContext(nullptr);
+  //     _standardPluginContext->release();
+  //     delete _standardPluginContext;
+  //     _standardPluginContext = nullptr;
+  //   }
+  // }
 }
 
 const void *load_plugin(const char *s, const char *id,
@@ -710,13 +733,15 @@ const void *get_data(const void *app, int32_t *data_len, const void **stream) {
   *stream = stream_;
 
   if (vst->_vstPlug->getState(stream_) != kResultOk) {
-    std::cout << "Failed to get processor state." << std::endl;
+    std::cerr << "Failed to get processor state." << std::endl;
     return nullptr;
   }
 
   Steinberg::int64 length = 0;
   stream_->tell(&length);
   *data_len = (int)length;
+
+  stream_->rewind();
 
   return stream_->getData();
 }
@@ -731,13 +756,15 @@ const void *get_controller_data(const void *app, int32_t *data_len, const void *
 
   // [UI-thread & Connected] 
   if (vst->_editController->getState(stream_) != kResultOk) {
-    std::cout << "Failed to get controller state." << std::endl;
+    std::cerr << "Failed to get controller state." << std::endl;
     return nullptr;
   }
 
   Steinberg::int64 length = 0;
   stream_->tell(&length);
   *data_len = (int)length;
+
+  stream_->rewind();
 
   return stream_->getData();
 }
@@ -756,26 +783,27 @@ void set_data(const void *app, const void *data, int32_t data_len) {
 
   PluginInstance *vst = (PluginInstance *)app;
 
-  ResizableMemoryIBStream stream = {};
+  ResizableMemoryIBStream stream;
 
   int num_bytes_written = 0;
   stream.write((void *)data, data_len, &num_bytes_written);
+  stream.rewind();
   assert(data_len == num_bytes_written);
 
-  for (int i = 0; i < data_len; i++) {
-    std::cout << (int)((uint8_t *)data)[i] << std::endl;
-  }
+  // for (int i = 0; i < data_len; i++) {
+  //   std::cout << (int)((uint8_t *)data)[i] << std::endl;
+  // }
 
   // [UI-thread & (Initialized | Connected | Setup Done | Activated | Processing)] 
   if (vst->_vstPlug->setState(&stream) != kResultOk) {
-    std::cout << "Failed to set processor state" << std::endl;
+    std::cerr << "Failed to set processor state" << std::endl;
   }
 
   stream.rewind();
 
   // [UI-thread & Connected] 
   if (vst->_editController->setComponentState(&stream) != kResultOk) {
-    std::cout << "Failed to set processor state in controller" << std::endl;
+    std::cerr << "Failed to set processor state in controller" << std::endl;
   }
 }
 
@@ -788,10 +816,11 @@ void set_controller_data(const void *app, const void *data, int32_t data_len) {
 
   PluginInstance *vst = (PluginInstance *)app;
 
-  ResizableMemoryIBStream stream = {};
+  ResizableMemoryIBStream stream;
 
   int num_bytes_written = 0;
   stream.write((void *)data, data_len, &num_bytes_written);
+  stream.rewind();
   assert(data_len == num_bytes_written);
 
   // [UI-thread & Connected]
