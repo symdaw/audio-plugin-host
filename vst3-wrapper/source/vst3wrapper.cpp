@@ -236,6 +236,7 @@ bool PluginInstance::init(const std::string &path, const std::string &id) {
   _processSetup.symbolicSampleSize = 0;
   _processSetup.sampleRate = 44100;
   _processSetup.maxSamplesPerBlock = MAX_BLOCK_SIZE;
+  _processSetup.processMode = Steinberg::Vst::kRealtime;
 
   _processData.numSamples = 0;
   _processData.processContext = &_processContext;
@@ -285,6 +286,8 @@ bool PluginInstance::load_plugin_from_class(
 
   param_edits = {};
 
+  // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/API+Documentation/Index.html#communication-between-the-components
+
   component_handler =
       new ComponentHandler(&param_edits, &param_edits_mutex,
                            rust_side_vst3_instance_object, &parameter_indicies);
@@ -306,7 +309,7 @@ bool PluginInstance::load_plugin_from_class(
   }
 
   auto stream = ResizableMemoryIBStream();
-
+  // stream.setByteOrder(kLittleEndian);
   if (_vstPlug->getState(&stream) == kResultTrue) {
     stream.rewind();
     _editController->setComponentState(&stream);
@@ -397,6 +400,8 @@ bool PluginInstance::load_plugin_from_class(
 }
 
 void PluginInstance::look_for_cc_mapping(MidiCC cc) {
+  ffi_ensure_main_thread("[VST3] look_for_cc_mapping");
+
   if (midi_cc_mappings.find(cc.as_key()) != midi_cc_mappings.end())
     return;
 
@@ -705,7 +710,28 @@ const void *get_data(const void *app, int32_t *data_len, const void **stream) {
   *stream = stream_;
 
   if (vst->_vstPlug->getState(stream_) != kResultOk) {
-    std::cout << "Failed to get plugin state. Non ok result." << std::endl;
+    std::cout << "Failed to get processor state." << std::endl;
+    return nullptr;
+  }
+
+  Steinberg::int64 length = 0;
+  stream_->tell(&length);
+  *data_len = (int)length;
+
+  return stream_->getData();
+}
+
+const void *get_controller_data(const void *app, int32_t *data_len, const void **stream) {
+  ffi_ensure_main_thread("[VST3] get_controller_data");
+
+  PluginInstance *vst = (PluginInstance *)app;
+
+  ResizableMemoryIBStream *stream_ = new ResizableMemoryIBStream();
+  *stream = stream_;
+
+  // [UI-thread & Connected] 
+  if (vst->_editController->getState(stream_) != kResultOk) {
+    std::cout << "Failed to get controller state." << std::endl;
     return nullptr;
   }
 
@@ -722,6 +748,12 @@ void free_data_stream(const void *stream) {
 }
 
 void set_data(const void *app, const void *data, int32_t data_len) {
+  ffi_ensure_main_thread("[VST3] set_data");
+
+  if (data_len == 0) return;
+
+  // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/API+Documentation/Index.html#persistence
+
   PluginInstance *vst = (PluginInstance *)app;
 
   ResizableMemoryIBStream stream = {};
@@ -730,12 +762,42 @@ void set_data(const void *app, const void *data, int32_t data_len) {
   stream.write((void *)data, data_len, &num_bytes_written);
   assert(data_len == num_bytes_written);
 
+  for (int i = 0; i < data_len; i++) {
+    std::cout << (int)((uint8_t *)data)[i] << std::endl;
+  }
+
+  // [UI-thread & (Initialized | Connected | Setup Done | Activated | Processing)] 
   if (vst->_vstPlug->setState(&stream) != kResultOk) {
-    std::cout << "Failed to set plugin state" << std::endl;
+    std::cout << "Failed to set processor state" << std::endl;
   }
 
   stream.rewind();
-  vst->_editController->setComponentState(&stream);
+
+  // [UI-thread & Connected] 
+  if (vst->_editController->setComponentState(&stream) != kResultOk) {
+    std::cout << "Failed to set processor state in controller" << std::endl;
+  }
+}
+
+void set_controller_data(const void *app, const void *data, int32_t data_len) {
+  ffi_ensure_main_thread("[VST3] set_controller_data");
+
+  if (data_len == 0) return;
+
+  // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/API+Documentation/Index.html#persistence
+
+  PluginInstance *vst = (PluginInstance *)app;
+
+  ResizableMemoryIBStream stream = {};
+
+  int num_bytes_written = 0;
+  stream.write((void *)data, data_len, &num_bytes_written);
+  assert(data_len == num_bytes_written);
+
+  // [UI-thread & Connected]
+  if (vst->_editController->setState(&stream) != kResultOk) {
+    std::cout << "Failed to set controller state" << std::endl;
+  }
 }
 
 void process(const void *app, const ProcessDetails *data, float ***input,
@@ -749,12 +811,20 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   vst->_processData.numSamples = data->block_size;
 
   for (int i = 0; i < audio_inputs; i++) {
-    vst->_processData.inputs->channelBuffers32 = input[i];
+    vst->_processData.inputs[i].numChannels = vst->_io_config.audio_inputs.data[i].value.channels;
+    vst->_processData.inputs[i].silenceFlags = 0;
+    vst->_processData.inputs[i].channelBuffers32 = input[i];
   }
 
+  vst->_processData.numInputs = audio_inputs;
+
   for (int i = 0; i < audio_outputs; i++) {
+    vst->_processData.outputs[i].numChannels = vst->_io_config.audio_outputs.data[i].value.channels;
+    vst->_processData.outputs[i].silenceFlags = 0;
     vst->_processData.outputs[i].channelBuffers32 = output[i];
   }
+
+  vst->_processData.numOutputs = audio_outputs;
 
   Steinberg::uint32 state = 0;
 
@@ -772,11 +842,11 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   vst->_processData.processContext->projectTimeMusic = data->player_time;
 
   vst->_processData.processContext->projectTimeSamples =
-      (data->player_time / (data->tempo / 60.0)) * data->sample_rate;
+      (data->player_time / (data->tempo / 60.)) * data->sample_rate;
 
   // TODO
   // vst->_processData.processContext->barPositionMusic = data.barPosBeats;
-  state |= ctx->kBarPositionValid;
+  // state |= ctx->kBarPositionValid;
 
   vst->_processData.processContext->cycleStartMusic = data->cycle_start;
   vst->_processData.processContext->cycleEndMusic = data->cycle_end;
@@ -807,7 +877,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   }
 
   vst->_processData.processContext->state = state;
-  vst->_processData.processContext->state = state;
+
 
   int midi_bus = 0;
   Steinberg::Vst::EventList *eventList = nullptr;
@@ -926,8 +996,9 @@ void process(const void *app, const ProcessDetails *data, float ***input,
           evt.data.size = 3;
           evt.data.type = Steinberg::Vst::DataEvent::DataTypes::kMidiSysEx;
           evt.data.bytes = events[i].event_type.midi._0.midi_data;
-          std::cout << events[i].event_type.midi._0.midi_data[1]
-                    << events[i].event_type.midi._0.midi_data[2] << std::endl;
+          std::cout << (int)events[i].event_type.midi._0.midi_data[1]
+                    << " "
+                    << (int)events[i].event_type.midi._0.midi_data[2] << std::endl;
           eventList->addEvent(evt);
         }
       }

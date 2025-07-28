@@ -90,27 +90,32 @@ impl PluginInner for Vst3 {
         let mut input_ptrs = HeaplessVec::<*mut *mut f32, 16>::new();
         let mut output_ptrs = HeaplessVec::<*mut *mut f32, 16>::new();
 
-
-        assert!(inputs.len() <= 16);        
+        assert!(inputs.len() <= 16);
         for bus in inputs.iter() {
             let mut channels = HeaplessVec::<*mut f32, 16>::new();
-            assert!(bus.data.len() <= 16);      
+            assert!(bus.data.len() <= 16);
             for channel_idx in 0..bus.data.len() {
-                channels.push(bus.data[channel_idx].as_ptr() as *mut f32).unwrap();
+                channels
+                    .push(bus.data[channel_idx].as_ptr() as *mut f32)
+                    .unwrap();
             }
             channel_buffers.push(channels).unwrap();
-            input_ptrs.push(channel_buffers.last_mut().unwrap().as_mut_ptr()).unwrap();
+            input_ptrs
+                .push(channel_buffers.last_mut().unwrap().as_mut_ptr())
+                .unwrap();
         }
 
-        assert!(outputs.len() <= 16);        
+        assert!(outputs.len() <= 16);
         for bus in outputs.iter_mut() {
             let mut channels = HeaplessVec::<*mut f32, 16>::new();
-            assert!(bus.data.len() <= 16);        
+            assert!(bus.data.len() <= 16);
             for channel_idx in 0..bus.data.len() {
                 channels.push(bus.data[channel_idx].as_mut_ptr()).unwrap();
             }
             channel_buffers.push(channels).unwrap();
-            output_ptrs.push(channel_buffers.last_mut().unwrap().as_mut_ptr()).unwrap();
+            output_ptrs
+                .push(channel_buffers.last_mut().unwrap().as_mut_ptr())
+                .unwrap();
         }
 
         unsafe {
@@ -127,7 +132,40 @@ impl PluginInner for Vst3 {
 
     fn set_preset_data(&mut self, data: Vec<u8>) -> Result<(), String> {
         unsafe {
-            vst3_wrapper_sys::set_data(self.app, data.as_ptr() as *const c_void, data.len() as i32);
+            let mut proc_data_len = 0;
+
+            if data.len() < 4 {
+                return Err("Invalid data".to_string());
+            }
+
+            proc_data_len |= data[0] as usize;
+            proc_data_len |= (data[1] as usize) << 8;
+            proc_data_len |= (data[2] as usize) << 8 * 2;
+            proc_data_len |= (data[3] as usize) << 8 * 3;
+
+            println!("loading with proc data len {}", proc_data_len);
+
+            if data.len() < proc_data_len {
+                return Err("Invalid data".to_string());
+            }
+
+            let processor_data = &data[4..(proc_data_len + 4)];
+            let controller_data = &data[(proc_data_len + 4)..];
+
+            println!("proc {}", processor_data.len());
+            println!("cont {}", controller_data.len());
+
+            vst3_wrapper_sys::set_data(
+                self.app,
+                processor_data.as_ptr() as *const c_void,
+                processor_data.len() as i32,
+            );
+            vst3_wrapper_sys::set_controller_data(
+                self.app,
+                controller_data.as_ptr() as *const c_void,
+                controller_data.len() as i32,
+            );
+
             Ok(())
         }
     }
@@ -136,22 +174,54 @@ impl PluginInner for Vst3 {
         unsafe {
             let mut len = 0;
             let mut stream = std::ptr::null();
-
             let data = vst3_wrapper_sys::get_data(
                 self.app,
                 &mut len as *mut i32,
                 &mut stream as *mut *const c_void,
             );
+            let processor_data = if !data.is_null() {
+                let data = std::slice::from_raw_parts(data as *const u8, len as usize)
+                    .to_vec()
+                    .clone();
+                vst3_wrapper_sys::free_data_stream(stream);
+                data
+            } else {
+                vec![]
+            };
 
-            if data.is_null() {
-                return Err("Failed to get preset data".to_string());
-            }
+            let mut len = 0;
+            let mut stream = std::ptr::null();
+            let data = vst3_wrapper_sys::get_controller_data(
+                self.app,
+                &mut len as *mut i32,
+                &mut stream as *mut *const c_void,
+            );
+            let controller_data = if !data.is_null() {
+                let data = std::slice::from_raw_parts(data as *const u8, len as usize)
+                    .to_vec()
+                    .clone();
+                vst3_wrapper_sys::free_data_stream(stream);
+                data
+            } else {
+                vec![]
+            };
 
-            let data = std::slice::from_raw_parts(data as *const u8, len as usize)
-                .to_vec()
-                .clone();
+            let mut data = vec![];
 
-            vst3_wrapper_sys::free_data_stream(stream);
+            let proc_data_len = processor_data.len();
+
+            data.push(((proc_data_len) & 0xFF) as u8);
+            data.push(((proc_data_len >> (8)) & 0xFF) as u8);
+            data.push(((proc_data_len >> (8 * 2)) & 0xFF) as u8);
+            data.push(((proc_data_len >> (8 * 3)) & 0xFF) as u8);
+
+            println!("saving with proc data len {}", proc_data_len);
+
+            println!("proc {}", processor_data.len());
+            println!("cont {}", controller_data.len());
+
+            data.extend(processor_data);
+            data.extend(controller_data);
 
             Ok(data)
         }

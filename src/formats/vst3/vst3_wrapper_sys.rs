@@ -33,8 +33,14 @@ extern "C" {
         data_len: *mut i32,
         stream: *mut *const c_void,
     ) -> *const c_void;
+    pub(super) fn get_controller_data(
+        app: *const c_void,
+        data_len: *mut i32,
+        stream: *mut *const c_void,
+    ) -> *const c_void;
     pub(super) fn free_data_stream(stream: *const c_void);
     pub(super) fn set_data(app: *const c_void, data: *const c_void, data_len: i32);
+    pub(super) fn set_controller_data(app: *const c_void, data: *const c_void, data_len: i32);
     pub(super) fn set_processing(app: *const c_void, processing: bool);
     pub(super) fn get_latency(app: *const c_void) -> u32;
     pub(super) fn get_descriptors(path: *const c_char, plugins: *mut HeaplessVec<FFIPluginDescriptor, 10>);

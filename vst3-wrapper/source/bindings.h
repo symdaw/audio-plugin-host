@@ -242,9 +242,13 @@ extern Parameter get_parameter(const void *app, int32_t id);
 
 extern const void *get_data(const void *app, int32_t *data_len, const void **stream);
 
+extern const void *get_controller_data(const void *app, int32_t *data_len, const void **stream);
+
 extern void free_data_stream(const void *stream);
 
 extern void set_data(const void *app, const void *data, int32_t data_len);
+
+extern void set_controller_data(const void *app, const void *data, int32_t data_len);
 
 extern void set_processing(const void *app, bool processing);
 
