@@ -4,13 +4,28 @@ project(vst3wrapper)
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDDL")
 
+set(CMAKE_CXX_STANDARD 17)
+
 if(DEFINED ENV{VSTSDK_DIR})
     file(TO_CMAKE_PATH $ENV{VSTSDK_DIR} VST_SOURCE_DIR)
 else()
     message(FATAL_ERROR "VSTSDK_DIR environment variable is not set.")
 endif()
 
+if (WIN32)
+    set(PLATFORM_SPECIFIC
+        ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_win32.cpp
+    )
+endif (WIN32)
+
+if (UNIX)
+    set(PLATFORM_SPECIFIC
+        ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_linux.cpp
+    )
+endif (UNIX)
+
 add_library(VST_SDK
+    ${PLATFORM_SPECIFIC}
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/connectionproxy.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/eventlist.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/hostclasses.cpp
@@ -32,12 +47,6 @@ add_library(VST_SDK
     ${VST_SOURCE_DIR}/vst3sdk/base/thread/source/flock.cpp
 )
 
-if (WIN32)
-    add_library(VST_SDK
-        ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_win32.cpp
-    )
-endif (WIN32)
-
 target_include_directories(VST_SDK
     PUBLIC "${VST_SOURCE_DIR}/vst3sdk/"
 )
@@ -54,17 +63,13 @@ set(vst3wrapper_sources
     source/memoryibstream.h
 )
 
+
 set(target vst3wrapper)
 add_library(${target} STATIC ${vst3wrapper_sources})
 target_compile_features(${target}
     PUBLIC
         cxx_std_17
 )
-
-# target_compile_features(vst3wrapper
-#     PUBLIC
-#         cxx_std_17
-# )
 
 target_compile_definitions(vst3wrapper
     PUBLIC
@@ -74,6 +79,7 @@ target_compile_definitions(vst3wrapper
 target_link_libraries(vst3wrapper
     PRIVATE
         VST_SDK
+	stdc++exp
 )
 
 target_include_directories(vst3wrapper

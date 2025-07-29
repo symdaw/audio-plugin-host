@@ -24,6 +24,9 @@ fn main() {
 
     println!("cargo::warning={}", dst.display());
 
+    //println!("cargo:rustc-link-arg=-D-GLIBCXX_USE_CXX11_ABI=1");
+    println!("cargo:rustc-link-lib=stdc++fs");
+
     println!("cargo:rustc-link-search=native={}", dst.display());
 
     println!("cargo:rustc-link-lib=static=vst3wrapper");
