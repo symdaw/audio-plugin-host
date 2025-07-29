@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -651,7 +653,7 @@ Dims show_gui(const void *app, const void *window_id) {
   }
 #else
   std::cout << "Platform is not supported yet" << std::endl;
-  return false;
+  return {};
 #endif
 
   ViewRect viewRect = {};

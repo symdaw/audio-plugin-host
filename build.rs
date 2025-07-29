@@ -10,15 +10,17 @@ fn main() {
         .expect("Unable to generate bindings")
         .write_to_file("vst3-wrapper/source/bindings.h");
 
-    println!("cargo:rustc-link-lib=ole32");
-
-    let dst = Config::new("vst3-wrapper")
+    let mut dst = Config::new("vst3-wrapper")
         .build_target("vst3wrapper")
         .profile("Release")
         .no_default_flags(true)
         .build()
-        .join("build")
-        .join("Release");
+        .join("build");
+
+    if std::env::var_os("CARGO_CFG_WINDOWS").is_some() {
+        dst.push("Release");
+        println!("cargo:rustc-link-lib=ole32");
+    }
 
     println!("cargo::warning={}", dst.display());
 
