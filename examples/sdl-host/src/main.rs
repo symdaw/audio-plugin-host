@@ -179,6 +179,23 @@ fn get_window_id(window: &sdl2::video::Window) -> *mut std::ffi::c_void {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub fn get_window_id(window: &sdl2::video::Window) -> *mut std::ffi::c_void  {
+    let mut wm_info = sdl2::sys::SDL_SysWMinfo {
+        version: sdl2::sys::SDL_version {
+            major: 2,
+            minor: 0,
+            patch: 10,
+        },
+        subsystem: sdl2::sys::SDL_SYSWM_TYPE::SDL_SYSWM_UNKNOWN,
+        info: unsafe { std::mem::zeroed() },
+    };
+
+    unsafe { sdl2::sys::SDL_GetWindowWMInfo(window.raw(), &mut wm_info) };
+
+    (unsafe { wm_info.info.x11.window }) as *mut std::ffi::c_void 
+}
+
 const CHANNELS: u8 = 2;
 const BLOCK_SIZE: usize = 512;
 const SAMPLE_RATE: u32 = 44100;
