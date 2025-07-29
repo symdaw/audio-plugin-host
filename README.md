@@ -3,7 +3,7 @@ High-level Rust hosting library for VST2/3 and CLAP. Largely based on [EasyVst](
 
 ## Setting up VST SDK
 1. Download the [VST SDK](https://download.steinberg.net/sdk_downloads/vst-sdk_3.7.7_build-19_2022-12-12.zip) and unzip it.
-2. Set the environment variable `VSTSDK_DIR` to the path of the unzipped SDK.
+2. Set the environment variable `VSTSDK_DIR` to the path of the unzipped SDK. To clarify, it should point to a directory called `VST_SDK` with multiple other files and directories inside it.
 
 ## Usage
 For full examples see the `examples` directory.
