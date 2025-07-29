@@ -18,11 +18,6 @@
 
 #include "bindings.h"
 
-struct ParameterChange {
-  int id;
-  float value;
-};
-
 struct ParameterEditState {
   int id;
   float initial_value;
@@ -39,7 +34,6 @@ struct MidiCC {
     return ((uint64_t)bus_index << 32) | ((uint64_t)bus_index << 16) | (uint64_t)channel;
   }
 };
-
 
 class PluginInstance {
 public:
@@ -81,7 +75,6 @@ public:
       _outSpeakerArrs;
 
   VST3::Hosting::Module::Ptr _module = nullptr;
-  Steinberg::IPtr<Steinberg::Vst::PlugProvider> _plugProvider = nullptr;
 
   Steinberg::IPtr<Steinberg::Vst::IComponent> _vstPlug = nullptr;
   Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> _audioEffect = nullptr;

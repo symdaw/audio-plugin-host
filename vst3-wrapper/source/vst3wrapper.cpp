@@ -265,19 +265,6 @@ bool PluginInstance::init(const std::string &path, const std::string &id) {
 bool PluginInstance::load_plugin_from_class(
     VST3::Hosting::PluginFactory &factory,
     VST3::Hosting::ClassInfo &classInfo) {
-  // _plugProvider = owned(NEW PlugProvider(factory, classInfo, true));
-  // if (!_plugProvider) {
-  //   std::cout << "No PlugProvider found" << std::endl;
-  //   return false;
-  // }
-
-  // _plugProvider->initialize();
-
-  // _vstPlug = _plugProvider->getComponent();
-  // if (factory.createInstance(classInfo.ID(), Vst::IComponent::iid, (void**)&_vstPlug) != kResultOk) {
-  //   std::cout << "No component" << std::endl;
-  // }
-
   _vstPlug = factory.createInstance<Steinberg::Vst::IComponent>(classInfo.ID());
   if (!_vstPlug) return false;
 
@@ -294,9 +281,6 @@ bool PluginInstance::load_plugin_from_class(
   auto res = _vstPlug->queryInterface(Vst::IEditController::iid, (void **)&_editController);
 
   if (res != Steinberg::kResultOk) {
-    // _editController = _plugProvider->getController();
-    // _editController = factory.createInstance<Steinberg::Vst::IEditController>(classInfo.ID());
-
     TUID controllerCID;
     if (_vstPlug->getControllerClassId(controllerCID) == kResultOk) {
       factory.get()->createInstance(controllerCID, Vst::IEditController::iid, (void**)&_editController);
@@ -563,7 +547,6 @@ void PluginInstance::_destroy(bool decrementRefCount) {
   _editController = nullptr;
   _audioEffect = nullptr;
   _vstPlug = nullptr;
-  _plugProvider = nullptr;
   _module = nullptr;
 
   _inAudioBusInfos.clear();
@@ -783,7 +766,8 @@ void set_data(const void *app, const void *data, int32_t data_len) {
 
   PluginInstance *vst = (PluginInstance *)app;
 
-  ResizableMemoryIBStream stream;
+  ResizableMemoryIBStream stream(data_len);
+  stream.rewind();
 
   int num_bytes_written = 0;
   stream.write((void *)data, data_len, &num_bytes_written);
@@ -816,7 +800,8 @@ void set_controller_data(const void *app, const void *data, int32_t data_len) {
 
   PluginInstance *vst = (PluginInstance *)app;
 
-  ResizableMemoryIBStream stream;
+  ResizableMemoryIBStream stream(data_len);
+  stream.rewind();
 
   int num_bytes_written = 0;
   stream.write((void *)data, data_len, &num_bytes_written);
