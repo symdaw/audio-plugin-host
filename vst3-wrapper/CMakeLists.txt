@@ -15,7 +15,6 @@ add_library(VST_SDK
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/eventlist.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/hostclasses.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module.cpp
-    ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_win32.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/parameterchanges.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/pluginterfacesupport.cpp
     ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/plugprovider.cpp
@@ -32,6 +31,12 @@ add_library(VST_SDK
     ${VST_SOURCE_DIR}/vst3sdk/base/source/updatehandler.cpp
     ${VST_SOURCE_DIR}/vst3sdk/base/thread/source/flock.cpp
 )
+
+if (WIN32)
+    add_library(VST_SDK
+        ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_win32.cpp
+    )
+endif (WIN32)
 
 target_include_directories(VST_SDK
     PUBLIC "${VST_SOURCE_DIR}/vst3sdk/"
