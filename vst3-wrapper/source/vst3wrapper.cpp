@@ -1,15 +1,15 @@
 #include "vst3wrapper.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cmath>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
 
-
 using namespace Steinberg;
 using namespace Steinberg::Vst;
+using namespace Steinberg::Vst::ChannelContext;
 
 const char *alloc_string(const char *str) {
   if (str == nullptr) {
@@ -268,7 +268,8 @@ bool PluginInstance::load_plugin_from_class(
     VST3::Hosting::PluginFactory &factory,
     VST3::Hosting::ClassInfo &classInfo) {
   _vstPlug = factory.createInstance<Steinberg::Vst::IComponent>(classInfo.ID());
-  if (!_vstPlug) return false;
+  if (!_vstPlug)
+    return false;
 
   if (_vstPlug->initialize(_standardPluginContext) != kResultOk) {
     std::cout << "Failed to initialize component" << std::endl;
@@ -280,12 +281,14 @@ bool PluginInstance::load_plugin_from_class(
     return false;
   }
 
-  auto res = _vstPlug->queryInterface(Vst::IEditController::iid, (void **)&_editController);
+  auto res = _vstPlug->queryInterface(Vst::IEditController::iid,
+                                      (void **)&_editController);
 
   if (res != Steinberg::kResultOk) {
     TUID controllerCID;
     if (_vstPlug->getControllerClassId(controllerCID) == kResultOk) {
-      factory.get()->createInstance(controllerCID, Vst::IEditController::iid, (void**)&_editController);
+      factory.get()->createInstance(controllerCID, Vst::IEditController::iid,
+                                    (void **)&_editController);
     }
   }
 
@@ -306,7 +309,7 @@ bool PluginInstance::load_plugin_from_class(
   Vst::IConnectionPoint *iConnectionPointController = nullptr;
 
   _vstPlug->queryInterface(Vst::IConnectionPoint::iid,
-                               (void **)&iConnectionPointComponent);
+                           (void **)&iConnectionPointComponent);
   _editController->queryInterface(Vst::IConnectionPoint::iid,
                                   (void **)&iConnectionPointController);
 
@@ -731,7 +734,8 @@ const void *get_data(const void *app, int32_t *data_len, const void **stream) {
   return stream_->getData();
 }
 
-const void *get_controller_data(const void *app, int32_t *data_len, const void **stream) {
+const void *get_controller_data(const void *app, int32_t *data_len,
+                                const void **stream) {
   ffi_ensure_main_thread("[VST3] get_controller_data");
 
   PluginInstance *vst = (PluginInstance *)app;
@@ -739,7 +743,7 @@ const void *get_controller_data(const void *app, int32_t *data_len, const void *
   ResizableMemoryIBStream *stream_ = new ResizableMemoryIBStream();
   *stream = stream_;
 
-  // [UI-thread & Connected] 
+  // [UI-thread & Connected]
   if (vst->_editController->getState(stream_) != kResultOk) {
     std::cerr << "Failed to get controller state." << std::endl;
     return nullptr;
@@ -762,7 +766,8 @@ void free_data_stream(const void *stream) {
 void set_data(const void *app, const void *data, int32_t data_len) {
   ffi_ensure_main_thread("[VST3] set_data");
 
-  if (data_len == 0) return;
+  if (data_len == 0)
+    return;
 
   // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/API+Documentation/Index.html#persistence
 
@@ -780,14 +785,15 @@ void set_data(const void *app, const void *data, int32_t data_len) {
   //   std::cout << (int)((uint8_t *)data)[i] << std::endl;
   // }
 
-  // [UI-thread & (Initialized | Connected | Setup Done | Activated | Processing)] 
+  // [UI-thread & (Initialized | Connected | Setup Done | Activated |
+  // Processing)]
   if (vst->_vstPlug->setState(&stream) != kResultOk) {
     std::cerr << "Failed to set processor state" << std::endl;
   }
 
   stream.rewind();
 
-  // [UI-thread & Connected] 
+  // [UI-thread & Connected]
   if (vst->_editController->setComponentState(&stream) != kResultOk) {
     std::cerr << "Failed to set processor state in controller" << std::endl;
   }
@@ -796,7 +802,8 @@ void set_data(const void *app, const void *data, int32_t data_len) {
 void set_controller_data(const void *app, const void *data, int32_t data_len) {
   ffi_ensure_main_thread("[VST3] set_controller_data");
 
-  if (data_len == 0) return;
+  if (data_len == 0)
+    return;
 
   // https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical+Documentation/API+Documentation/Index.html#persistence
 
@@ -827,7 +834,8 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   vst->_processData.numSamples = data->block_size;
 
   for (int i = 0; i < audio_inputs; i++) {
-    vst->_processData.inputs[i].numChannels = vst->_io_config.audio_inputs.data[i].value.channels;
+    vst->_processData.inputs[i].numChannels =
+        vst->_io_config.audio_inputs.data[i].value.channels;
     vst->_processData.inputs[i].silenceFlags = 0;
     vst->_processData.inputs[i].channelBuffers32 = input[i];
   }
@@ -835,7 +843,8 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   vst->_processData.numInputs = audio_inputs;
 
   for (int i = 0; i < audio_outputs; i++) {
-    vst->_processData.outputs[i].numChannels = vst->_io_config.audio_outputs.data[i].value.channels;
+    vst->_processData.outputs[i].numChannels =
+        vst->_io_config.audio_outputs.data[i].value.channels;
     vst->_processData.outputs[i].silenceFlags = 0;
     vst->_processData.outputs[i].channelBuffers32 = output[i];
   }
@@ -893,7 +902,6 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   }
 
   vst->_processData.processContext->state = state;
-
 
   int midi_bus = 0;
   Steinberg::Vst::EventList *eventList = nullptr;
@@ -1012,9 +1020,9 @@ void process(const void *app, const ProcessDetails *data, float ***input,
           evt.data.size = 3;
           evt.data.type = Steinberg::Vst::DataEvent::DataTypes::kMidiSysEx;
           evt.data.bytes = events[i].event_type.midi._0.midi_data;
-          std::cout << (int)events[i].event_type.midi._0.midi_data[1]
-                    << " "
-                    << (int)events[i].event_type.midi._0.midi_data[2] << std::endl;
+          std::cout << (int)events[i].event_type.midi._0.midi_data[1] << " "
+                    << (int)events[i].event_type.midi._0.midi_data[2]
+                    << std::endl;
           eventList->addEvent(evt);
         }
       }
@@ -1052,6 +1060,40 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   if (eventList) {
     eventList->clear();
   }
+}
+
+void set_track_details(const void *app, const Track *details) {
+  ffi_ensure_main_thread("[VST3] set_track_details");
+
+  PluginInstance *vst = (PluginInstance *)app;
+  
+  IInfoListener *track_info_listener = nullptr;
+  vst->_editController->queryInterface(IInfoListener::iid,
+                                (void **)&track_info_listener);
+  if (track_info_listener == nullptr)
+    return;
+
+  auto list = HostAttributeList::make();
+
+  // https://github.com/steinbergmedia/vst3_pluginterfaces/blob/dd77488d3dc329c484b5dfb47af9383356e4c0cc/vst/ivstchannelcontextinfo.h#L189-L208
+  uint64_t col = 0;
+  col |= (uint64_t)details->col.b;
+  col |= (uint64_t)details->col.g << 8;
+  col |= (uint64_t)details->col.r << (8 * 2);
+  col |= (uint64_t)details->col.a << (8 * 3);
+
+  list->setInt(ChannelContext::kChannelColorKey, col);
+
+  TChar name[64] = {};
+  for (int i = 0; i < details->name.data.count; i++) {
+    name[i] = (TChar)details->name.data.data[i].value;
+  }
+
+  list->setString(ChannelContext::kChannelNameKey, name);
+  list->setInt(ChannelContext::kChannelNameLengthKey, details->name.data.count);
+
+  // [UI-thread & (Initialized | Connected | Setup Done | Activated | Processing)] 
+  track_info_listener->setChannelContextInfos(list);
 }
 
 void set_param_in_edit_controller(const void *app, int32_t id, float value) {

@@ -15,6 +15,7 @@
 #include <public.sdk/source/vst/hosting/eventlist.h>
 #include <public.sdk/source/vst/hosting/parameterchanges.h>
 #include <public.sdk/source/vst/hosting/processdata.h>
+#include <pluginterfaces/vst/ivstchannelcontextinfo.h>
 
 #include "bindings.h"
 

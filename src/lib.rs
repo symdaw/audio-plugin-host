@@ -9,6 +9,7 @@ pub mod parameter;
 pub mod plugin;
 pub mod heapless_vec;
 pub mod thread_check;
+pub mod track;
 
 pub use plugin::load;
 

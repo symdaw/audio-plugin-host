@@ -11,13 +11,7 @@ use std::{
 use ringbuf::{traits::*, HeapCons, HeapRb};
 
 use crate::{
-    audio_bus::{AudioBus, IOConfigutaion},
-    discovery::PluginDescriptor,
-    error::{err, Error},
-    event::{HostIssuedEvent, PluginIssuedEvent},
-    host::Host,
-    parameter::Parameter,
-    BlockSize, ProcessDetails, SampleRate, Samples, WindowIDType,
+    audio_bus::{AudioBus, IOConfigutaion}, discovery::PluginDescriptor, error::{err, Error}, event::{HostIssuedEvent, PluginIssuedEvent}, host::Host, parameter::Parameter, track::Track, BlockSize, ProcessDetails, SampleRate, Samples, WindowIDType
 };
 
 /// Loads a plugin of any of the supported formats from the given path and returns a
@@ -265,6 +259,10 @@ impl PluginInstance {
             self.inner.change_block_size(last_block_size);
         }
     }
+
+    pub fn set_track_details(&self, details: &Track) {
+        self.inner.set_track_details(details);
+    }
 }
 
 pub(crate) trait PluginInner {
@@ -302,4 +300,6 @@ pub(crate) trait PluginInner {
     fn editor_updates(&mut self) {}
 
     fn get_parameter_count(&self) -> usize;
+
+    fn set_track_details(&self, details: &Track) {}
 }

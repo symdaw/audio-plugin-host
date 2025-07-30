@@ -290,6 +290,10 @@ impl PluginInner for Vst3 {
     fn change_sample_rate(&mut self, _rate: crate::SampleRate) {
         unsafe { vst3_wrapper_sys::vst3_set_sample_rate(self.app, _rate as i32) };
     }
+
+    fn set_track_details(&self, details: &crate::track::Track) {
+        unsafe { vst3_wrapper_sys::set_track_details(self.app, details) };
+    }
 }
 
 /// Gets param updates taking the final update at the latest sample for each parameter

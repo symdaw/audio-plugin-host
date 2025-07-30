@@ -6,7 +6,7 @@ use std::{
 use ringbuf::{traits::Producer};
 
 use crate::{
-    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, ProcessDetails
+    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, track::Track, ProcessDetails
 };
 
 #[link(name = "vst3wrapper", kind = "static")]
@@ -46,6 +46,7 @@ extern "C" {
     pub(super) fn get_descriptors(path: *const c_char, plugins: *mut HeaplessVec<FFIPluginDescriptor, 10>);
 
     pub(super) fn vst3_set_sample_rate(app: *const c_void, sample_rate: i32);
+    pub(super) fn set_track_details(app: *const c_void, details: *const Track);
 
     fn free_string(str: *const c_char);
 }

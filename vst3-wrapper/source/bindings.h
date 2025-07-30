@@ -166,6 +166,18 @@ struct Parameter {
   float default_value;
 };
 
+struct Colour {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t a;
+};
+
+struct Track {
+  HeaplessString<64> name;
+  Colour col;
+};
+
 /// Events sent to the host from the plugin. Queued in the plugin and the consumed from the `get_events` function.
 struct PluginIssuedEvent {
   enum class Tag {
@@ -257,6 +269,8 @@ extern uint32_t get_latency(const void *app);
 extern void get_descriptors(const char *path, HeaplessVec<FFIPluginDescriptor, 10> *plugins);
 
 extern void vst3_set_sample_rate(const void *app, int32_t sample_rate);
+
+extern void set_track_details(const void *app, const Track *details);
 
 extern void free_string(const char *str);
 
