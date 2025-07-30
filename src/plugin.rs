@@ -260,7 +260,7 @@ impl PluginInstance {
         }
     }
 
-    pub fn set_track_details(&self, details: &Track) {
+    pub fn set_track_details(&mut self, details: &Track) {
         self.inner.set_track_details(details);
     }
 }
@@ -301,5 +301,5 @@ pub(crate) trait PluginInner {
 
     fn get_parameter_count(&self) -> usize;
 
-    fn set_track_details(&self, details: &Track) {}
+    fn set_track_details(&mut self, details: &Track) {}
 }

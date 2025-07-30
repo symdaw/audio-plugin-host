@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use clap_sys::audio_buffer::*;
 use clap_sys::entry::*;
 use clap_sys::events::*;
-use clap_sys::ext::audio_ports::*;
+use clap_sys::ext::{audio_ports::*, track_info};
 // use clap_sys::ext::audio_ports_activation::*;
 use clap_sys::ext::audio_ports_config::*;
 use clap_sys::ext::gui::*;
@@ -21,6 +21,7 @@ use clap_sys::ext::state::*;
 use clap_sys::ext::tail::*;
 use clap_sys::ext::thread_check::*;
 use clap_sys::ext::thread_pool::*;
+use clap_sys::ext::track_info::{clap_plugin_track_info, clap_track_info, CLAP_EXT_TRACK_INFO};
 use clap_sys::factory::plugin_factory::*;
 use clap_sys::host::*;
 use clap_sys::plugin::*;
@@ -42,6 +43,7 @@ use crate::plugin::PluginInner;
 use crate::thread_check::{
     ensure_main_thread, ensure_non_main_thread, is_main_thread, is_thread_checking_enabled,
 };
+use crate::track::Track;
 use crate::{BlockSize, SampleRate, WindowIDType};
 
 struct Clap {
@@ -59,6 +61,7 @@ struct Clap {
     active: AtomicBool,
     processing: AtomicBool,
     last_io_config: Option<IOConfigutaion>,
+    track_details: Option<Track>,
 }
 
 type EventBuffer = HeaplessVec<ClapEvent, 64>;
@@ -158,6 +161,7 @@ impl Clap {
             active: AtomicBool::new(false),
             processing: AtomicBool::new(false),
             last_io_config: None,
+            track_details: None,
         })
     }
 
@@ -1003,6 +1007,18 @@ impl PluginInner for Clap {
             self.block_size = size;
             self.deactivate();
             self.activate();
+        }
+    }
+
+    fn set_track_details(&mut self, details: &crate::track::Track) {
+        self.track_details = Some(details.clone());
+
+        unsafe {
+            if let Some(track_info) =
+                get_extension::<clap_plugin_track_info>(self.plugin, CLAP_EXT_TRACK_INFO)
+            {
+                track_info.changed.unwrap()(self.plugin);
+            }
         }
     }
 }

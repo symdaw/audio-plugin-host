@@ -291,7 +291,7 @@ impl PluginInner for Vst3 {
         unsafe { vst3_wrapper_sys::vst3_set_sample_rate(self.app, _rate as i32) };
     }
 
-    fn set_track_details(&self, details: &crate::track::Track) {
+    fn set_track_details(&mut self, details: &crate::track::Track) {
         unsafe { vst3_wrapper_sys::set_track_details(self.app, details) };
     }
 }
