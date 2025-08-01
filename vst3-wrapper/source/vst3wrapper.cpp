@@ -194,7 +194,7 @@ const int MAX_BLOCK_SIZE = 4096 * 2;
 
 void get_descriptors(const char *path,
                      HeaplessVec<FFIPluginDescriptor, 10> *plugins) {
-  auto plugin_ctx = owned(NEW HostApplication());
+  auto plugin_ctx = NEW HostApplication();
   PluginContextFactory::instance().setPluginContext(plugin_ctx);
 
   std::string error;

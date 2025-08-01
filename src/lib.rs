@@ -10,6 +10,7 @@ pub mod plugin;
 pub mod heapless_vec;
 pub mod thread_check;
 pub mod track;
+pub(crate) mod utils;
 
 pub use plugin::load;
 

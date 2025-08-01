@@ -19,3 +19,6 @@ cbindgen = "0.28.0"
 [features]
 serde = ["dep:serde"]
 future_thread_pool = ["dep:futures"]
+
+# [lib]
+# crate-type = ["cdylib", "rlib"]

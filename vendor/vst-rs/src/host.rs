@@ -434,7 +434,10 @@ impl<T: Host> PluginLoader<T> {
                     // Search the library for the VSTAPI entry point
                     match lib.get(b"VSTPluginMain") {
                         Ok(s) => *s,
-                        _ => return Err(PluginLoadError::NotAPlugin),
+                        _ => {
+                            println!("no entry point");
+                            return Err(PluginLoadError::NotAPlugin)
+                        },
                     }
                 ,
                 lib: Arc::new(lib),

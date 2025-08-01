@@ -12,6 +12,7 @@ use crate::host::{Host, KnobPreference, Language};
 use crate::parameter::Parameter;
 use crate::plugin::PluginInner;
 use crate::thread_check::{ensure_main_thread, ensure_non_main_thread};
+use crate::utils::macos_exec_location;
 use crate::{error::Error, SampleRate};
 use crate::{BlockSize, PlayingState, ProcessDetails, WindowIDType};
 
@@ -33,7 +34,10 @@ use super::Common;
 
 pub(crate) fn get_descriptor(path: &Path) -> Option<PluginDescriptor> {
     let host = NullHost {};
-    let mut loader = vst::host::PluginLoader::load(path, Arc::new(Mutex::new(host))).ok()?;
+
+    let path = macos_exec_location(path)?;
+
+    let mut loader = vst::host::PluginLoader::load(&path, Arc::new(Mutex::new(host))).ok()?;
 
     let instance = loader.instance().ok()?;
 
