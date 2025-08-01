@@ -6,13 +6,13 @@ use std::{
 use ringbuf::{traits::Producer};
 
 use crate::{
-    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, track::Track, ProcessDetails
+    audio_bus::IOConfigutaion, event::{HostIssuedEvent, PluginIssuedEvent}, formats::{vst3::Vst3, Format, PluginDescriptor}, heapless_vec::HeaplessVec, parameter::Parameter, track::Track, ProcessDetails, WindowIDType
 };
 
 #[link(name = "vst3wrapper", kind = "static")]
 extern "C" {
     pub(super) fn load_plugin(path: *const c_char, id: *const c_char, vst3_instance: *const c_void) -> *const c_void;
-    pub(super) fn show_gui(app: *const c_void, window_id: *const c_void) -> Dims;
+    pub(super) fn show_gui(app: *const c_void, window_id: *const c_void, window_id_type: WindowIDType) -> Dims;
     pub(super) fn hide_gui(app: *const c_void);
     pub(super) fn descriptor(app: *const c_void) -> FFIPluginDescriptor;
     pub(super) fn io_config(app: *const c_void) -> IOConfigutaion;

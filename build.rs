@@ -20,7 +20,7 @@ fn main() {
     if std::env::var_os("CARGO_CFG_WINDOWS").is_some() {
         dst.push("Release");
         println!("cargo:rustc-link-lib=ole32");
-    } else {
+    } else if std::env::var_os("CARGO_CFG_LINUX").is_some() {
         println!("cargo:rustc-link-lib=stdc++fs");
     }
 

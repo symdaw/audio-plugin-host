@@ -83,9 +83,12 @@ impl PlayingState {
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum WindowIDType {
+    /// Cast the HWND to *const c_void
     HWND, 
+    /// Cast the X window ID to *const c_void
     XWNDX11,
     XWNDWayland,
+    /// Give raw pointer to NSView
     NSView,
     Other,
 }

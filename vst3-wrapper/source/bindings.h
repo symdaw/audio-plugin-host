@@ -20,6 +20,17 @@ enum class PlayingState : uint8_t {
   OfflineRendering,
 };
 
+enum class WindowIDType : uint8_t {
+  /// Cast the HWND to *const c_void
+  HWND,
+  /// Cast the X window ID to *const c_void
+  XWNDX11,
+  XWNDWayland,
+  /// Give raw pointer to NSView
+  NSView,
+  Other,
+};
+
 template<typename T>
 union MaybeUninit {
   T value;
@@ -231,7 +242,7 @@ void ffi_ensure_non_main_thread(const char *fn_name);
 
 extern const void *load_plugin(const char *path, const char *id, const void *vst3_instance);
 
-extern Dims show_gui(const void *app, const void *window_id);
+extern Dims show_gui(const void *app, const void *window_id, WindowIDType window_id_type);
 
 extern void hide_gui(const void *app);
 
