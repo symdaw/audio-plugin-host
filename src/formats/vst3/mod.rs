@@ -242,9 +242,9 @@ impl PluginInner for Vst3 {
     fn show_editor(
         &mut self,
         window_id: *mut std::ffi::c_void,
-        _window_id_type: WindowIDType,
+        window_id_type: WindowIDType,
     ) -> Result<(usize, usize), Error> {
-        let dims = unsafe { vst3_wrapper_sys::show_gui(self.app, window_id as *const c_void) };
+        let dims = unsafe { vst3_wrapper_sys::show_gui(self.app, window_id as *const c_void, window_id_type) };
 
         Ok((dims.width as usize, dims.height as usize))
     }

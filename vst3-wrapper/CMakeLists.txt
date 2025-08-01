@@ -18,11 +18,17 @@ if (WIN32)
     )
 endif (WIN32)
 
-if (UNIX)
+if (LINUX)
     set(PLATFORM_SPECIFIC
         ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_linux.cpp
     )
-endif (UNIX)
+endif (LINUX)
+
+if (APPLE)
+    set(PLATFORM_SPECIFIC
+        ${VST_SOURCE_DIR}/vst3sdk/public.sdk/source/vst/hosting/module_mac.mm
+    )
+endif (APPLE)
 
 add_library(VST_SDK
     ${PLATFORM_SPECIFIC}
@@ -70,6 +76,11 @@ target_compile_features(${target}
     PUBLIC
         cxx_std_17
 )
+
+if (APPLE)
+    set_property (TARGET VST_SDK APPEND_STRING PROPERTY 
+                  COMPILE_FLAGS "-fobjc-arc")
+endif (APPLE)
 
 target_compile_definitions(vst3wrapper
     PUBLIC

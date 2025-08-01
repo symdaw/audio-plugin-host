@@ -623,7 +623,8 @@ const void *load_plugin(const char *s, const char *id,
   return vst;
 }
 
-Dims show_gui(const void *app, const void *window_id) {
+Dims show_gui(const void *app, const void *window_id,
+              WindowIDType window_id_type) {
   PluginInstance *vst = (PluginInstance *)app;
 
   if (!vst->_editController) {
@@ -642,22 +643,30 @@ Dims show_gui(const void *app, const void *window_id) {
         owned(new PlugFrame(vst->rust_side_vst3_instance_object)));
   }
 
-#ifdef _WIN32
-  if (vst->_view->isPlatformTypeSupported(Steinberg::kPlatformTypeHWND) !=
-      Steinberg::kResultTrue) {
-    std::cerr << "Editor view does not support HWND" << std::endl;
+  auto platform = Steinberg::kPlatformTypeHWND;
+
+  switch (window_id_type) {
+  case WindowIDType::HWND:
+    platform = kPlatformTypeHWND;
+    break;
+  case WindowIDType::NSView:
+    platform = kPlatformTypeNSView;
+    break;
+  case WindowIDType::XWNDX11:
+    platform = kPlatformTypeX11EmbedWindowID;
+    break;
+  }
+
+  if (vst->_view->isPlatformTypeSupported(platform) != Steinberg::kResultTrue) {
+    std::cerr << "Editor view does not support this platform" << std::endl;
     return {};
   }
 
-  if (vst->_view->attached((void *)window_id, Steinberg::kPlatformTypeHWND) !=
+  if (vst->_view->attached((void *)window_id, platform) !=
       Steinberg::kResultOk) {
-    std::cout << "Failed to attach editor view to HWND" << std::endl;
+    std::cerr << "Failed to attach editor view to view" << std::endl;
     return {};
   }
-#else
-  std::cout << "Platform is not supported yet" << std::endl;
-  return {};
-#endif
 
   ViewRect viewRect = {};
   if (vst->_view->getSize(&viewRect) != kResultOk) {
@@ -1066,10 +1075,10 @@ void set_track_details(const void *app, const Track *details) {
   ffi_ensure_main_thread("[VST3] set_track_details");
 
   PluginInstance *vst = (PluginInstance *)app;
-  
+
   IInfoListener *track_info_listener = nullptr;
   vst->_editController->queryInterface(IInfoListener::iid,
-                                (void **)&track_info_listener);
+                                       (void **)&track_info_listener);
   if (track_info_listener == nullptr)
     return;
 
@@ -1092,7 +1101,8 @@ void set_track_details(const void *app, const Track *details) {
   list->setString(ChannelContext::kChannelNameKey, name);
   list->setInt(ChannelContext::kChannelNameLengthKey, details->name.data.count);
 
-  // [UI-thread & (Initialized | Connected | Setup Done | Activated | Processing)] 
+  // [UI-thread & (Initialized | Connected | Setup Done | Activated |
+  // Processing)]
   track_info_listener->setChannelContextInfos(list);
 }
 
