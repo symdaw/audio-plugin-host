@@ -5,7 +5,9 @@ pub fn macos_exec_location(path: impl AsRef<Path>) -> Option<PathBuf> {
 
     #[cfg(target_os = "macos")]
     {
-        use std::fs;
+        if path.is_file() {
+            return Some(path);
+        }
 
         path.push("Contents");
         path.push("MacOS");
@@ -14,7 +16,12 @@ pub fn macos_exec_location(path: impl AsRef<Path>) -> Option<PathBuf> {
             return None;
         }
 
-        path = fs::read_dir(&path).ok()?.into_iter().next()?.ok()?.path();
+        path = std::fs::read_dir(&path)
+            .ok()?
+            .into_iter()
+            .next()?
+            .ok()?
+            .path();
     }
 
     Some(path)
