@@ -69,7 +69,6 @@ set(vst3wrapper_sources
     source/memoryibstream.h
 )
 
-
 set(target vst3wrapper)
 add_library(${target} STATIC ${vst3wrapper_sources})
 target_compile_features(${target}
@@ -78,8 +77,8 @@ target_compile_features(${target}
 )
 
 if (APPLE)
-    set_property (TARGET VST_SDK APPEND_STRING PROPERTY 
-                  COMPILE_FLAGS "-fobjc-arc")
+    set_property(TARGET VST_SDK APPEND_STRING PROPERTY 
+                  COMPILE_FLAGS "-fobjc-arc -fno-rtti -lc++")
 endif (APPLE)
 
 target_compile_definitions(vst3wrapper

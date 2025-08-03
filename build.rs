@@ -14,6 +14,8 @@ fn main() {
         .build_target("vst3wrapper")
         .profile("Release")
         .no_default_flags(true)
+        .cxxflag("-stdlib=libc++")
+        // .cxxflag("-lc++")
         .build()
         .join("build");
 
@@ -22,6 +24,10 @@ fn main() {
         println!("cargo:rustc-link-lib=ole32");
     } else if std::env::var_os("CARGO_CFG_LINUX").is_some() {
         println!("cargo:rustc-link-lib=stdc++fs");
+    } else {
+        println!("cargo:rustc-link-lib=dylib=objc");
+        println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=c++");
     }
 
     println!("cargo::warning={}", dst.display());

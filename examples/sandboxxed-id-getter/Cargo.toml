@@ -6,3 +6,9 @@ edition = "2021"
 [dependencies]
 audio-plugin-host = { path = "../.." }
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "sandboxxed-id-getter"
+path = "src/main.rs"
