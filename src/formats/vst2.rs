@@ -35,9 +35,9 @@ use super::Common;
 pub(crate) fn get_descriptor(path: &Path) -> Option<PluginDescriptor> {
     let host = NullHost {};
 
-    let path = macos_exec_location(path)?;
+    let bin_path = macos_exec_location(path)?;
 
-    let mut loader = vst::host::PluginLoader::load(&path, Arc::new(Mutex::new(host))).ok()?;
+    let mut loader = vst::host::PluginLoader::load(&bin_path, Arc::new(Mutex::new(host))).ok()?;
 
     let instance = loader.instance().ok()?;
 
@@ -60,6 +60,10 @@ pub(super) fn load(
     path: &Path,
     common: Common,
 ) -> Result<(Box<dyn PluginInner>, PluginDescriptor), Error> {
+    let Some(path) = macos_exec_location(path) else {
+        return err("Invalid app bundle".to_string());
+    };
+
     let details = Arc::new(std::sync::Mutex::new(ProcessDetails::default()));
     let size_change = Arc::new(std::sync::Mutex::new(None));
     let editor_param_state = Arc::new(std::sync::Mutex::new(EditorParamsState {
@@ -78,9 +82,10 @@ pub(super) fn load(
         io_changed: io_changed.clone(),
     }));
 
-    let mut loader = vst::host::PluginLoader::load(path, Arc::clone(&host)).map_err(|e| Error {
-        message: e.to_string(),
-    })?;
+    let mut loader =
+        vst::host::PluginLoader::load(&path, Arc::clone(&host)).map_err(|e| Error {
+            message: e.to_string(),
+        })?;
 
     let mut instance = loader.instance().map_err(|e| Error {
         message: e.to_string(),
@@ -175,7 +180,11 @@ impl PluginInner for Vst2 {
         self.state = Vst2State::Resumed;
     }
 
-    fn show_editor(&mut self, window_id: *mut std::ffi::c_void, _window_id_type: WindowIDType) -> Result<(usize, usize), Error> {
+    fn show_editor(
+        &mut self,
+        window_id: *mut std::ffi::c_void,
+        _window_id_type: WindowIDType,
+    ) -> Result<(usize, usize), Error> {
         ensure_main_thread("[VST2] show_editor");
 
         if self.editor.is_none() {

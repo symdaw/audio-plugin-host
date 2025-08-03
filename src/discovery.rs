@@ -32,7 +32,7 @@ pub enum Format {
     Clap,
 }
 
-/// Returns any plugin descriptors of plugins in a file. Note that formats such as VST3 allow 
+/// Returns any plugin descriptors of plugins in a file. Note that formats such as VST3 allow
 /// multiple plugins to be defined in the same file.
 pub fn get_descriptor_from_file(path: impl AsRef<Path>) -> Vec<PluginDescriptor> {
     if is_vst2(path.as_ref(), false) {
@@ -55,12 +55,17 @@ pub fn is_vst2(path: &Path, check_contents: bool) -> bool {
         return false;
     }
 
-    let path = path.to_string_lossy().to_lowercase();
-    if !(path.ends_with(".dll") || path.ends_with(".so") || path.ends_with(".vst")) {
+    let ext = path.extension().unwrap();
+    if ext != "dll" && ext != "so" && ext != "vst" {
         return false;
     }
 
     if !check_contents {
+        return true;
+    }
+
+    #[cfg(target_os = "macos")]
+    if path.is_dir() {
         return true;
     }
 
