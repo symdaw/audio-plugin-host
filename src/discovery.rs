@@ -55,7 +55,7 @@ pub fn is_vst2(path: &Path, check_contents: bool) -> bool {
         return false;
     }
 
-    let ext = path.extension().unwrap();
+    let ext = path.extension().unwrap_or_default();
     if ext != "dll" && ext != "so" && ext != "vst" {
         return false;
     }
