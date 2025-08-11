@@ -69,14 +69,11 @@ pub fn is_vst2(path: &Path, check_contents: bool) -> bool {
         return true;
     }
 
+    println!("{}", path.display());
+
     let data = std::fs::read(path).expect("Failed to read file");
     match goblin::Object::parse(&data) {
-        Ok(goblin::Object::Elf(elf)) => elf.syms.iter().any(|s| {
-            elf.strtab
-                .get_at(s.st_shndx)
-                .map(|s| s == "VSTPluginMain")
-                .unwrap_or(false)
-        }),
+        Ok(goblin::Object::Elf(elf)) => elf.dynstrtab.to_vec().map(|t| t.contains(&"VSTPluginMain")).unwrap_or(true),
         Ok(goblin::Object::PE(pe)) => pe.exports.iter().any(|e| e.name == Some("VSTPluginMain")),
         _ => true, // Can't check so just return true
     }
