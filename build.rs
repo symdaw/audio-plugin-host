@@ -14,17 +14,16 @@ fn main() {
         .build_target("vst3wrapper")
         .profile("Release")
         .no_default_flags(true)
-        .cxxflag("-stdlib=libc++")
-        // .cxxflag("-lc++")
+        // .cxxflag("-stdlib=libc++") // macos
         .build()
         .join("build");
 
     if std::env::var_os("CARGO_CFG_WINDOWS").is_some() {
         dst.push("Release");
         println!("cargo:rustc-link-lib=ole32");
-    } else if std::env::var_os("CARGO_CFG_LINUX").is_some() {
+    } else if std::env::var("CARGO_CFG_TARGET_OS") == Ok("linux".to_string()) {
         println!("cargo:rustc-link-lib=stdc++fs");
-    } else {
+    } else if std::env::var("CARGO_CFG_TARGET_OS") == Ok("macos".to_string()) {
         println!("cargo:rustc-link-lib=dylib=objc");
         println!("cargo:rustc-link-lib=framework=Foundation");
         println!("cargo:rustc-link-lib=c++");
