@@ -17,7 +17,11 @@ use crate::{
 /// Loads a plugin of any of the supported formats from the given path and returns a
 /// `PluginInstance`. A plugin's `id` can be obtained from `discovery::get_descriptor_from_file(path)[0].id`.
 /// Note that formats such as VST3 allow multiple plugins to be defined in the same file.
-pub fn load<P: AsRef<Path>>(path: P, id: &str, host: &Host) -> Result<PluginInstance, Error> {
+pub fn load(path: impl AsRef<Path>, id: &str, host: &Host) -> Result<PluginInstance, Error> {
+    if !path.as_ref().exists() {
+        return err("Path does not exist");
+    }
+
     let plugin_issued_events: HeapRb<PluginIssuedEvent> = HeapRb::new(512);
     let (plugin_issued_events_producer, plugin_issued_events_consumer) =
         plugin_issued_events.split();
