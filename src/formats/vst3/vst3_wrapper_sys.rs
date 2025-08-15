@@ -47,6 +47,7 @@ extern "C" {
 
     pub(super) fn vst3_set_sample_rate(app: *const c_void, sample_rate: i32);
     pub(super) fn set_track_details(app: *const c_void, details: *const Track);
+    pub(super) fn unload(app: *const c_void);
 
     fn free_string(str: *const c_char);
 }

@@ -60,9 +60,9 @@ pub fn is_vst2(path: &Path, check_contents: bool) -> bool {
         return false;
     }
 
-    if !check_contents {
+    // if !check_contents {
         return true;
-    }
+    // }
 
     #[cfg(target_os = "macos")]
     if path.is_dir() {

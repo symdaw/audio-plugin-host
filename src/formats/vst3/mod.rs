@@ -340,3 +340,11 @@ pub fn get_descriptor(path: &Path) -> Vec<PluginDescriptor> {
         .map(|d| d.to_plugin_descriptor(path))
         .collect::<Vec<_>>()
 }
+
+impl Drop for Vst3 {
+    fn drop(&mut self) {
+        unsafe {
+            vst3_wrapper_sys::unload(self.app);
+        }
+    }
+}

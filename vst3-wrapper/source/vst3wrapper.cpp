@@ -549,11 +549,12 @@ IOConfigutaion PluginInstance::get_io_config() {
 
 void PluginInstance::_destroy(bool decrementRefCount) {
   // destroyView();
+
   _editController = nullptr;
   _audioEffect = nullptr;
   _vstPlug = nullptr;
   _module = nullptr;
-
+  
   _inAudioBusInfos.clear();
   _outAudioBusInfos.clear();
   _numInAudioBuses = 0;
@@ -567,20 +568,20 @@ void PluginInstance::_destroy(bool decrementRefCount) {
   _inSpeakerArrs.clear();
   _outSpeakerArrs.clear();
 
-  if (_processData.inputEvents) {
-    delete[] static_cast<Steinberg::Vst::EventList *>(_processData.inputEvents);
-  }
-  if (_processData.outputEvents) {
-    delete[] static_cast<Steinberg::Vst::EventList *>(
-        _processData.outputEvents);
-  }
-  _processData.unprepare();
-  _processData = {};
+  // if (_processData.inputEvents) {
+  //   delete[] static_cast<Steinberg::Vst::EventList *>(_processData.inputEvents);
+  // }
+  // if (_processData.outputEvents) {
+  //   delete[] static_cast<Steinberg::Vst::EventList *>(
+  //       _processData.outputEvents);
+  // }
+  // _processData.unprepare();
+  // _processData = {};
+  //
+  // _processSetup = {};
+  // _processContext = {};
 
-  _processSetup = {};
-  _processContext = {};
-
-  name = "";
+  // name = "";
 
   // if (decrementRefCount) {
   //   if (_standardPluginContextRefCount > 0) {
@@ -682,8 +683,10 @@ Dims show_gui(const void *app, const void *window_id,
 
 void hide_gui(const void *app) {
   PluginInstance *vst = (PluginInstance *)app;
-  vst->_view->release();
-  vst->_view = nullptr;
+  if (vst->_view != nullptr) {
+    vst->_view->release();
+    vst->_view = nullptr;
+  }
 }
 
 FFIPluginDescriptor descriptor(const void *app) {
@@ -1186,4 +1189,23 @@ uintptr_t parameter_count(const void *app) {
 
   // [UI-thread & Connected]
   return vst->_editController->getParameterCount();
+};
+
+void unload(const void *app) {
+  hide_gui(app);
+  set_processing(app, false);
+
+  auto vst = (PluginInstance *)app;
+
+
+  vst->_editController->terminate();
+  vst->_editController->release();
+
+  vst->_vstPlug->setActive(false);
+  vst->_vstPlug->terminate();
+  vst->_vstPlug->release();
+
+  vst->destroy();
+
+  // delete vst;
 };

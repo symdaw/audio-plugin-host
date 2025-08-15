@@ -283,6 +283,8 @@ extern void vst3_set_sample_rate(const void *app, int32_t sample_rate);
 
 extern void set_track_details(const void *app, const Track *details);
 
+extern void unload(const void *app);
+
 extern void free_string(const char *str);
 
 void send_event_to_host(const PluginIssuedEvent *event, const void *vst3_instance);
