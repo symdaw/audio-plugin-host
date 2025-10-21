@@ -78,6 +78,10 @@ impl PluginInner for Vst3 {
         //   the processor by passing the new values as Steinberg::Vst::IParameterChanges to the
         //   process call. "
         while let Some(param_update) = self.param_updates_for_audio_processor.try_pop() {
+            if param_update.current_value.is_nan() {
+                continue;
+            }
+
             events.push(HostIssuedEvent {
                 ppq_time: process_details.player_time,
                 event_type: HostIssuedEventType::Parameter(param_update),

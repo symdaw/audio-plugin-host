@@ -305,5 +305,5 @@ pub(crate) trait PluginInner {
 
     fn get_parameter_count(&self) -> usize;
 
-    fn set_track_details(&mut self, details: &Track) {}
+    fn set_track_details(&mut self, _details: &Track) {}
 }
