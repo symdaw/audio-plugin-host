@@ -11,7 +11,14 @@ use std::{
 use ringbuf::{traits::*, HeapCons, HeapRb};
 
 use crate::{
-    audio_bus::{AudioBus, IOConfigutaion}, discovery::PluginDescriptor, error::{err, Error}, event::{HostIssuedEvent, PluginIssuedEvent}, host::Host, parameter::Parameter, track::Track, BlockSize, ProcessDetails, SampleRate, Samples, WindowIDType
+    audio_bus::{AudioBus, IOConfigutaion},
+    discovery::PluginDescriptor,
+    error::{err, Error},
+    event::{HostIssuedEvent, PluginIssuedEvent},
+    host::Host,
+    parameter::Parameter,
+    track::Track,
+    BlockSize, ProcessDetails, SampleRate, Samples, WindowIDType,
 };
 
 /// Loads a plugin of any of the supported formats from the given path and returns a
@@ -34,6 +41,33 @@ pub fn load(path: impl AsRef<Path>, id: &str, host: &Host) -> Result<PluginInsta
     let (mut inner, descriptor) = crate::formats::load_any(path.as_ref(), id, common)?;
 
     let io_configuration = inner.get_io_configuration();
+
+    Ok(PluginInstance {
+        latency: AtomicUsize::new(descriptor.initial_latency),
+        window: Box::new(()),
+        descriptor,
+        inner,
+        plugin_issued_events: plugin_issued_events_consumer,
+        sample_rate: 0,
+        block_size: 0,
+        last_seen_block_size: AtomicUsize::new(0),
+        last_seen_sample_rate: AtomicUsize::new(0),
+        showing_editor: false,
+        io_configuration,
+        resumed: false,
+    })
+}
+
+/// For wrapping custom implementations of `PluginInner` in a normal `PluginInstance` to use your
+/// custom plugin type the same way you use the others.
+pub fn create_plugin_from_custom(mut inner: Box<dyn PluginInner>, descriptor: PluginDescriptor) -> Result<PluginInstance, Error> {
+    let plugin_issued_events: HeapRb<PluginIssuedEvent> = HeapRb::new(512);
+    let (plugin_issued_events_producer, plugin_issued_events_consumer) =
+        plugin_issued_events.split();
+
+    let io_configuration = inner.get_io_configuration();
+
+    inner.update_events_producer(plugin_issued_events_producer);
 
     Ok(PluginInstance {
         latency: AtomicUsize::new(descriptor.initial_latency),
@@ -269,7 +303,7 @@ impl PluginInstance {
     }
 }
 
-pub(crate) trait PluginInner {
+pub trait PluginInner {
     fn process(
         &mut self,
         inputs: &[AudioBus<f32>],
@@ -306,4 +340,6 @@ pub(crate) trait PluginInner {
     fn get_parameter_count(&self) -> usize;
 
     fn set_track_details(&mut self, _details: &Track) {}
+
+    fn update_events_producer(&mut self, _producer: ringbuf::HeapProd<PluginIssuedEvent>) {}
 }
