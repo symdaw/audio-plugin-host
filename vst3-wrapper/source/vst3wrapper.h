@@ -98,6 +98,10 @@ public:
 
   const void *rust_side_vst3_instance_object = nullptr;
 
+  Steinberg::Vst::IConnectionPoint *iConnectionPointComponent = nullptr;
+  Steinberg::Vst::IConnectionPoint *iConnectionPointController = nullptr;
+
   static Steinberg::Vst::HostApplication *_standardPluginContext;
   static int _standardPluginContextRefCount;
+
 };

@@ -400,10 +400,6 @@ bool PluginInstance::load_plugin_from_class(
     std::cout << "Failed to setup VST processing" << std::endl;
   }
 
-  if (_vstPlug->setActive(true) != kResultTrue) {
-    std::cout << "Failed to activate VST component" << std::endl;
-  }
-
   get_io_config();
 
   look_for_cc_mapping({0, 0, 129});
@@ -602,7 +598,6 @@ const void *load_plugin(const char *s, const char *id,
   vst->rust_side_vst3_instance_object = rust_side_vst3_instance_object;
   vst->init(s, id);
 
-  vst->_audioEffect->setProcessing(true);
 
   auto aud_in = vst->_vstPlug->getBusCount(kAudio, kInput);
   for (int i = 0; i < aud_in; i++) {
@@ -617,6 +612,14 @@ const void *load_plugin(const char *s, const char *id,
   auto evt_in = vst->_vstPlug->getBusCount(kEvent, kInput);
   for (int i = 0; i < evt_in; i++) {
     vst->_vstPlug->activateBus(kEvent, kInput, i, true);
+  }
+
+  if (vst->_vstPlug->setActive(true) != kResultTrue) {
+    std::cout << "Failed to activate VST component" << std::endl;
+  }
+
+  if (vst->_audioEffect->setProcessing(true)) {
+    std::cout << "Failed to being processing" << std::endl;
   }
 
   // NOTE: Output event buses are not supported yet so they are not activated
@@ -1112,6 +1115,7 @@ void set_track_details(const void *app, const Track *details) {
 void set_param_in_edit_controller(const void *app, int32_t id, float value) {
   PluginInstance *vst = (PluginInstance *)app;
 
+  // Takes param id
   if (vst->_editController->setParamNormalized(id, value) != kResultOk) {
     std::cout << "Failed to set parameter normalized" << std::endl;
   }
@@ -1119,7 +1123,7 @@ void set_param_in_edit_controller(const void *app, int32_t id, float value) {
 
 void free_string(const char *str) { delete[] str; }
 
-Parameter get_parameter(const void *app, int32_t id) {
+Parameter get_parameter(const void *app, int32_t index) {
   // TODO: sort out naming confusion with id and index
 
   ffi_ensure_main_thread("[VST3] get_parameter");
@@ -1127,9 +1131,10 @@ Parameter get_parameter(const void *app, int32_t id) {
   PluginInstance *vst = (PluginInstance *)app;
 
   ParameterInfo param_info = {};
-  vst->_editController->getParameterInfo(id, param_info);
+  // Takes index
+  vst->_editController->getParameterInfo(index, param_info);
 
-  vst->parameter_indicies[param_info.id] = id;
+  vst->parameter_indicies[param_info.id] = index;
 
   // TODO: Make real-time safe with stack buffers
 
@@ -1158,7 +1163,7 @@ Parameter get_parameter(const void *app, int32_t id) {
 
   Parameter param = {};
   param.id = param_info.id;
-  param.index = id;
+  param.index = index;
   param.value = (float)value;
 
   push_c_str_to_heapless_string(&param.name, name.c_str());
@@ -1197,15 +1202,23 @@ void unload(const void *app) {
 
   auto vst = (PluginInstance *)app;
 
+  vst->_vstPlug->setActive(false);
+
+  if (vst->iConnectionPointComponent && vst->iConnectionPointController) {
+    vst->iConnectionPointComponent->disconnect(vst->iConnectionPointController);
+    vst->iConnectionPointController->disconnect(vst->iConnectionPointComponent);
+  } else {
+    std::cout << "Failed to get connection points." << std::endl;
+  }
 
   vst->_editController->terminate();
-  vst->_editController->release();
 
-  vst->_vstPlug->setActive(false);
   vst->_vstPlug->terminate();
-  vst->_vstPlug->release();
 
   vst->destroy();
+
+  // vst->_editController->release();
+  // vst->_vstPlug->release();
 
   // delete vst;
 };
