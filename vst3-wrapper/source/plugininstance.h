@@ -27,7 +27,7 @@ public:
   bool load_plugin_from_class(VST3::Hosting::PluginFactory &factory,
                               VST3::Hosting::ClassInfo &classInfo);
 
-  Steinberg::Vst::HostProcessData _processData = {};
+  Steinberg::Vst::HostProcessData process_data = {};
 
   std::unordered_map<uint64_t, Steinberg::Vst::ParamID> midi_cc_mappings = {};
 

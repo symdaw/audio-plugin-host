@@ -22,8 +22,8 @@ bool PluginInstance::init(const std::string &path, const std::string &id) {
   process_setup.maxSamplesPerBlock = MAX_BLOCK_SIZE;
   process_setup.processMode = Steinberg::Vst::kRealtime;
 
-  _processData.numSamples = 0;
-  _processData.processContext = &_processContext;
+  process_data.numSamples = 0;
+  process_data.processContext = &_processContext;
 
   std::string error;
   _module = VST3::Hosting::Module::create(path, error);
@@ -167,13 +167,13 @@ bool PluginInstance::load_plugin_from_class(
 
   res = audio_processor->setupProcessing(process_setup);
   if (res == kResultOk) {
-    _processData.prepare(*component, MAX_BLOCK_SIZE,
+    process_data.prepare(*component, MAX_BLOCK_SIZE,
                          process_setup.symbolicSampleSize);
     if (_numInEventBuses > 0) {
-      _processData.inputEvents = new EventList[_numInEventBuses];
+      process_data.inputEvents = new EventList[_numInEventBuses];
     }
     if (_numOutEventBuses > 0) {
-      _processData.outputEvents = new EventList[_numOutEventBuses];
+      process_data.outputEvents = new EventList[_numOutEventBuses];
     }
   } else {
     std::cout << "Failed to setup VST processing" << std::endl;

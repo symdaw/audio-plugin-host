@@ -1,4 +1,6 @@
-#include "vst3wrapper.h"
+#include "common.h"
+#include "plugininstance.h"
+#include "plugframe.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -109,10 +111,10 @@ Steinberg::Vst::EventList *
 PluginInstance::eventList(Steinberg::Vst::BusDirection direction, int which) {
   if (direction == kInput) {
     return static_cast<Steinberg::Vst::EventList *>(
-        &_processData.inputEvents[which]);
+        &process_data.inputEvents[which]);
   } else if (direction == kOutput) {
     return static_cast<Steinberg::Vst::EventList *>(
-        &_processData.outputEvents[which]);
+        &process_data.outputEvents[which]);
   } else {
     return nullptr;
   }
@@ -123,10 +125,10 @@ PluginInstance::parameterChanges(Steinberg::Vst::BusDirection direction,
                                  int which) {
   if (direction == kInput) {
     return static_cast<Steinberg::Vst::ParameterChanges *>(
-        &_processData.inputParameterChanges[which]);
+        &process_data.inputParameterChanges[which]);
   } else if (direction == kOutput) {
     return static_cast<Steinberg::Vst::ParameterChanges *>(
-        &_processData.outputParameterChanges[which]);
+        &process_data.outputParameterChanges[which]);
   } else {
     return nullptr;
   }
@@ -306,7 +308,7 @@ void vst3_set_sample_rate(const void *app, int32_t rate) {
   // [(UI-thread or processing-thread) & Activated]
   vst->audio_processor->setProcessing(true);
 
-  vst->_processData.processContext->sampleRate = rate;
+  vst->process_data.processContext->sampleRate = rate;
 }
 
 const void *get_data(const void *app, int32_t *data_len, const void **stream) {
@@ -426,57 +428,57 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   auto audio_inputs = vst->_io_config.audio_inputs.count;
   auto audio_outputs = vst->_io_config.audio_outputs.count;
 
-  vst->_processData.numSamples = data->block_size;
+  vst->process_data.numSamples = data->block_size;
 
   for (int i = 0; i < audio_inputs; i++) {
-    vst->_processData.inputs[i].numChannels =
+    vst->process_data.inputs[i].numChannels =
         vst->_io_config.audio_inputs.data[i].value.channels;
-    vst->_processData.inputs[i].silenceFlags = 0;
-    vst->_processData.inputs[i].channelBuffers32 = input[i];
+    vst->process_data.inputs[i].silenceFlags = 0;
+    vst->process_data.inputs[i].channelBuffers32 = input[i];
   }
 
-  vst->_processData.numInputs = audio_inputs;
+  vst->process_data.numInputs = audio_inputs;
 
   for (int i = 0; i < audio_outputs; i++) {
-    vst->_processData.outputs[i].numChannels =
+    vst->process_data.outputs[i].numChannels =
         vst->_io_config.audio_outputs.data[i].value.channels;
-    vst->_processData.outputs[i].silenceFlags = 0;
-    vst->_processData.outputs[i].channelBuffers32 = output[i];
+    vst->process_data.outputs[i].silenceFlags = 0;
+    vst->process_data.outputs[i].channelBuffers32 = output[i];
   }
 
-  vst->_processData.numOutputs = audio_outputs;
+  vst->process_data.numOutputs = audio_outputs;
 
   Steinberg::uint32 state = 0;
 
-  Steinberg::Vst::ProcessContext *ctx = vst->_processData.processContext;
+  Steinberg::Vst::ProcessContext *ctx = vst->process_data.processContext;
 
-  vst->_processData.processContext->tempo = data->tempo;
+  vst->process_data.processContext->tempo = data->tempo;
   state |= ctx->kTempoValid;
 
-  vst->_processData.processContext->timeSigNumerator =
+  vst->process_data.processContext->timeSigNumerator =
       data->time_signature_numerator;
-  vst->_processData.processContext->timeSigDenominator =
+  vst->process_data.processContext->timeSigDenominator =
       data->time_signature_denominator;
   state |= ctx->kTimeSigValid;
 
-  vst->_processData.processContext->projectTimeMusic = data->player_time;
+  vst->process_data.processContext->projectTimeMusic = data->player_time;
 
-  vst->_processData.processContext->projectTimeSamples =
+  vst->process_data.processContext->projectTimeSamples =
       (data->player_time / (data->tempo / 60.)) * data->sample_rate;
 
   // TODO
   // vst->_processData.processContext->barPositionMusic = data.barPosBeats;
   // state |= ctx->kBarPositionValid;
 
-  vst->_processData.processContext->cycleStartMusic = data->cycle_start;
-  vst->_processData.processContext->cycleEndMusic = data->cycle_end;
+  vst->process_data.processContext->cycleStartMusic = data->cycle_start;
+  vst->process_data.processContext->cycleEndMusic = data->cycle_end;
   state |= ctx->kCycleValid;
 
-  vst->_processData.processContext->systemTime = data->nanos;
+  vst->process_data.processContext->systemTime = data->nanos;
   state |= ctx->kSystemTimeValid;
 
-  vst->_processData.processContext->frameRate.framesPerSecond = 60.;
-  vst->_processData.processContext->frameRate.flags = 0;
+  vst->process_data.processContext->frameRate.framesPerSecond = 60.;
+  vst->process_data.processContext->frameRate.flags = 0;
 
   if (data->cycle_enabled) {
     state |= ctx->kCycleActive;
@@ -491,18 +493,18 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   }
 
   if (data->playing_state == PlayingState::OfflineRendering) {
-    vst->_processData.processMode = kOffline;
+    vst->process_data.processMode = kOffline;
   } else {
-    vst->_processData.processMode = kRealtime;
+    vst->process_data.processMode = kRealtime;
   }
 
-  vst->_processData.processContext->state = state;
+  vst->process_data.processContext->state = state;
 
   int midi_bus = 0;
   Steinberg::Vst::EventList *eventList = nullptr;
 
-  if (!vst->_processData.inputParameterChanges) {
-    vst->_processData.inputParameterChanges = new ParameterChanges(400);
+  if (!vst->process_data.inputParameterChanges) {
+    vst->process_data.inputParameterChanges = new ParameterChanges(400);
   }
 
   if (vst->_io_config.event_inputs_count > 0) {
@@ -591,7 +593,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
               vst->midi_cc_mappings.end()) {
             ParamID id = vst->midi_cc_mappings[cc.as_key()];
 
-            auto changes = vst->_processData.inputParameterChanges;
+            auto changes = vst->process_data.inputParameterChanges;
 
             int queue_index = 0;
             auto queue = changes->addParameterData(id, queue_index);
@@ -628,7 +630,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
     if (events[i].event_type.tag != HostIssuedEventType::Tag::Parameter)
       continue;
 
-    auto changes = vst->_processData.inputParameterChanges;
+    auto changes = vst->process_data.inputParameterChanges;
 
     auto time = events[i].block_time;
     auto id = events[i].event_type.parameter._0.parameter_id;
@@ -647,7 +649,7 @@ void process(const void *app, const ProcessDetails *data, float ***input,
   }
 
   // [processing-thread & Processing]
-  tresult result = vst->audio_processor->process(vst->_processData);
+  tresult result = vst->audio_processor->process(vst->process_data);
   if (result != kResultOk) {
     std::cout << "Failed to process" << std::endl;
   }
