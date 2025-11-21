@@ -62,11 +62,10 @@ target_compile_definitions(VST_SDK
 )
 
 set(vst3wrapper_sources
-    # ${SDK_ROOT}/public.sdk/source/vst/hosting/plugprovider.cpp
-    # ${SDK_ROOT}/public.sdk/source/vst/hosting/plugprovider.h
     source/vst3wrapper.cpp
-    source/vst3wrapper.h
-    source/memoryibstream.h
+    source/componenthandler.cpp
+    source/plugframe.cpp
+    source/plugininstance.cpp
 )
 
 set(target vst3wrapper)

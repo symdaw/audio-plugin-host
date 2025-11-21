@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [-IC:\Users\jaspe\Downloads\VST_SDK\vst3sdk\, -DRELEASE]

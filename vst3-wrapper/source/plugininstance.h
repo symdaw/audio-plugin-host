@@ -1,40 +1,10 @@
 #pragma once
 
-#include <cstdint>
-#include <mutex>
+#include "common.h"
+
+#include "componenthandler.h"
+
 #include <unordered_map>
-
-#include "public.sdk/source/vst/hosting/hostclasses.h"
-#include "public.sdk/source/vst/hosting/module.h"
-#include "public.sdk/source/vst/hosting/plugprovider.h"
-
-#include "memoryibstream.h"
-#include "stringconvert.h"
-
-#include <pluginterfaces/gui/iplugview.h>
-#include <public.sdk/source/vst/hosting/eventlist.h>
-#include <public.sdk/source/vst/hosting/parameterchanges.h>
-#include <public.sdk/source/vst/hosting/processdata.h>
-#include <pluginterfaces/vst/ivstchannelcontextinfo.h>
-
-#include "bindings.h"
-
-struct ParameterEditState {
-  int id;
-  float initial_value;
-  float current_value;
-  bool finished;
-};
-
-struct MidiCC {
-  int32_t bus_index;
-  int16_t channel;
-  int16_t control_number;
-
-  uint64_t as_key() {
-    return ((uint64_t)bus_index << 32) | ((uint64_t)bus_index << 16) | (uint64_t)channel;
-  }
-};
 
 class PluginInstance {
 public:
@@ -59,7 +29,6 @@ public:
 
   Steinberg::Vst::HostProcessData _processData = {};
 
-  std::unordered_map<Steinberg::Vst::ParamID, int> parameter_indicies = {};
   std::unordered_map<uint64_t, Steinberg::Vst::ParamID> midi_cc_mappings = {};
 
   void look_for_cc_mapping(MidiCC cc);
@@ -68,7 +37,6 @@ public:
 
   std::vector<Steinberg::Vst::BusInfo> _inAudioBusInfos, _outAudioBusInfos;
   int _numInAudioBuses = 0, _numOutAudioBuses = 0;
-
   std::vector<Steinberg::Vst::BusInfo> _inEventBusInfos, _outEventBusInfos;
   int _numInEventBuses = 0, _numOutEventBuses = 0;
 
@@ -77,31 +45,27 @@ public:
 
   VST3::Hosting::Module::Ptr _module = nullptr;
 
-  Steinberg::IPtr<Steinberg::Vst::IComponent> _vstPlug = nullptr;
-  Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> _audioEffect = nullptr;
-  Steinberg::IPtr<Steinberg::Vst::IEditController> _editController = nullptr;
+  Steinberg::IPtr<Steinberg::Vst::IComponent> component = nullptr;
+  Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> audio_processor = nullptr;
+  Steinberg::IPtr<Steinberg::Vst::IEditController> edit_controller = nullptr;
 
-  void *component_handler = nullptr;
+  ComponentHandler *component_handler = nullptr;
 
-  Steinberg::Vst::ProcessSetup _processSetup = {};
+  Steinberg::Vst::ProcessSetup process_setup = {};
   Steinberg::Vst::ProcessContext _processContext = {};
 
   Steinberg::IPtr<Steinberg::IPlugView> _view = nullptr;
 
-  std::vector<ParameterEditState> param_edits;
-  std::mutex param_edits_mutex;
+  const void *rust_side_vst3_instance_object = nullptr;
 
   std::string name;
   std::string vendor;
   std::string version;
   std::string id;
 
-  const void *rust_side_vst3_instance_object = nullptr;
-
   Steinberg::Vst::IConnectionPoint *iConnectionPointComponent = nullptr;
   Steinberg::Vst::IConnectionPoint *iConnectionPointController = nullptr;
 
-  static Steinberg::Vst::HostApplication *_standardPluginContext;
-  static int _standardPluginContextRefCount;
-
+  static Steinberg::Vst::HostApplication *standard_plugin_context;
+  static int standard_plugin_context_ref_count;
 };
